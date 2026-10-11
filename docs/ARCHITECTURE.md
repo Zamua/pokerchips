@@ -43,8 +43,12 @@ checks, rate limits and logging wrap them at the Worker and the cell.
   command reads and writes the table with nothing interleaving.
 - **Storage.** SQLite tables `state` (the table as one JSON row), `ledger`
   (append-only) and `answers` (the last 64 answers per seat, for repeated
-  `op` ids). A command's table, entries and answer commit in one
-  transaction, about three rows written.
+  `op` ids, indexed by seat and answer number so finding the newest and
+  pruning the oldest are range seeks). A command's table, entries and answer
+  commit in one transaction, about five rows written. The store keeps the
+  table and the newest 50 ledger entries in memory, following each commit, so
+  a command reads about five rows whatever the ledger's length; an actor
+  woken from hibernation reads them once.
 - **Sockets.** The WebSocket Hibernation API: a socket's attachment records
   its seat once `hello` succeeds, so presence is "any open socket holding
   this seat". `ping` is an auto-response and never wakes the table.
