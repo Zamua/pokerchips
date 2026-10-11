@@ -1,0 +1,43 @@
+{
+  "name": "pokerchips",
+  "version": "3.0.0-dev",
+  "private": true,
+  "description": "A chip tracker for an in-person poker night: one Durable Object per table.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config client/vite.config.ts",
+    "build": "vite build --config client/vite.config.ts",
+    "worker": "wrangler dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "npm run build && playwright test -c client/e2e/playwright.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p worker/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@fontsource/rubik": "^5.3.0",
+    "@fontsource/unbounded": "^5.3.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.0",
+    "@cloudflare/workers-types": "^5.20261010.1",
+    "@playwright/test": "1.63.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.28.2": true,
+    "workerd@1.20260815.1": true,
+    "workerd@1.20261006.1": true,
+    "fsevents": false
+  }
+}

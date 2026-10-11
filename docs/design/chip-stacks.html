@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chip Stacks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800;900&family=Rubik:wght@400;500;600;700;800&display=block" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/bold/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/fill/style.css">
+<style>
+:root{
+  --cobalt:#2C42D6;
+  --cobalt-deep:#2236B8;
+  --ink:#14143A;
+  --paper:#FFFFFF;
+  --sun:#FFD23F;
+  --tomato:#FF5B3D;
+  --mint:#2CCB7F;
+  --pink:#FF9BD2;
+  --sky:#A8D8FF;
+  --lilac:#9C7BFF;
+  --mist:#C9CFF5;
+  --disp:"Unbounded",system-ui,sans-serif;
+  --ui:"Rubik",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--cobalt);color:var(--ink);font-family:var(--ui);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.d{font-family:var(--disp);font-variant-numeric:tabular-nums}
+.game,.landing{position:absolute;inset:0;padding-top:env(safe-area-inset-top);overflow:hidden}
+.game{background:radial-gradient(circle at 1px 1px,rgba(255,255,255,.10) 1.2px,transparent 1.6px) 0 0/18px 18px,var(--cobalt)}
+.landing{display:none;background:radial-gradient(circle at 1px 1px,rgba(255,255,255,.10) 1.2px,transparent 1.6px) 0 0/18px 18px,var(--cobalt)}
+body.scr-landing .landing{display:block}
+body.scr-landing .game,body.scr-landing .actionbar{display:none}
+
+.card{background:var(--paper);border:2.5px solid var(--ink);border-radius:20px;box-shadow:4px 4px 0 var(--ink)}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0}
+.ticket{display:flex;align-items:center;gap:10px;height:46px;padding:0 5px 0 14px;border-radius:14px;background:var(--paper);border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.ticket .cd{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.04em}
+.ticket .sh{width:34px;height:34px;border-radius:10px;background:var(--ink);color:var(--sun);display:grid;place-items:center;font-size:18px}
+.live{display:flex;align-items:center;gap:7px;height:36px;padding:0 12px;border-radius:999px;background:rgba(20,20,58,.35);color:var(--paper);font-weight:600;font-size:14px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 2px var(--ink)}
+
+/* you */
+.you{margin:14px 16px 0;background:var(--sun);position:relative;height:138px;padding:14px 16px;overflow:hidden}
+.you .who{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}
+.you .big{font-family:var(--disp);font-weight:900;font-size:46px;line-height:1;margin-top:10px;letter-spacing:-.02em}
+.you .lbl{font-weight:600;font-size:14px;margin-top:6px;opacity:.75}
+.you .tower{position:absolute;right:6px;bottom:-6px;display:flex;align-items:flex-end}
+.you .tower svg + svg{margin-left:-10px}
+
+.badge{display:inline-flex;align-items:center;gap:3px;font-family:var(--ui);font-weight:800;font-size:10.5px;letter-spacing:.06em;line-height:1;padding:4px 6px;border-radius:6px;border:2px solid var(--ink)}
+.b-you{background:var(--ink);color:var(--sun)}
+.b-host{background:var(--pink);color:var(--ink)}
+.b-away{background:var(--mist);color:#4A4F7A;border-style:dashed}
+
+/* pots */
+.pots{display:grid;grid-template-columns:1.3fr 1fr;gap:12px;margin:14px 16px 0}
+.pot{height:100px;padding:11px 12px;position:relative;overflow:hidden}
+.pot .pl{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
+.pot .pa{font-family:var(--disp);font-weight:800;font-size:34px;line-height:1;margin-top:12px}
+.pot .pile{position:absolute;right:4px;bottom:-4px;display:flex;align-items:flex-end}
+.pot.side{background:var(--sky)}
+.pot.side .pa{font-size:28px}
+
+/* table grid */
+.sech{display:flex;justify-content:space-between;align-items:baseline;margin:16px 18px 8px;color:var(--paper)}
+.sech h2{font-family:var(--disp);font-weight:700;font-size:15px}
+.sech span{font-size:14px;font-weight:600;opacity:.8}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px}
+.pc{height:98px;padding:8px 9px;border-radius:16px;border:2.5px solid var(--ink);background:var(--paper);box-shadow:3px 3px 0 var(--ink);display:flex;flex-direction:column}
+.pc .r1{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.pc .nm{font-weight:700;font-size:14px;margin-top:6px;line-height:1.1}
+.pc .st{font-family:var(--disp);font-weight:800;font-size:19px;margin-top:auto;line-height:1.1}
+.pc.away{background:var(--mist);box-shadow:none;border-style:dashed}
+.pc.away .st,.pc.away .nm{color:#4A4F7A}
+.pc.invite{background:transparent;border:2.5px dashed rgba(255,255,255,.6);box-shadow:none;color:var(--paper);align-items:center;justify-content:center;gap:4px;font-weight:700;font-size:14px}
+.pc.invite i{font-size:24px}
+.pc .badge{font-size:9px;padding:3px 4px;border-width:1.5px}
+
+/* activity */
+.feed{margin:16px 16px 0;padding:6px 12px}
+.ev{display:flex;align-items:center;gap:10px;height:40px}
+.ev + .ev{border-top:2px dashed #D5D8EE}
+.ev .ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--ink);font-size:15px;flex:none}
+.ev .ic.bet{background:var(--tomato);color:var(--paper)}
+.ev .ic.win{background:var(--sun)}
+.ev .t{flex:1;font-size:15px;font-weight:500;white-space:nowrap}
+.ev .t b{font-weight:700}
+.ev .t .n{font-family:var(--disp);font-weight:700;font-size:13.5px}
+.ev .tm{font-size:13px;font-weight:600;color:#6B6F95}
+.undo{display:flex;align-items:center;gap:5px;height:30px;padding:0 10px;border-radius:9px;border:2px solid var(--ink);background:var(--paper);box-shadow:2px 2px 0 var(--ink);font-weight:700;font-size:13.5px}
+
+/* action bar */
+.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;gap:10px;padding:34px 16px calc(14px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(44,66,214,0) 0,rgba(44,66,214,.92) 30px,var(--cobalt) 48px)}
+.act{height:58px;border-radius:18px;border:2.5px solid var(--ink);box-shadow:4px 4px 0 var(--ink);display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--disp);font-weight:800;font-size:17px}
+.act i{font-size:22px}
+.act.bet{flex:1.3;background:var(--tomato);color:var(--paper)}
+.act.win{flex:1;background:var(--mint)}
+.act.more{width:58px;flex:none;background:var(--paper)}
+
+/* drawer */
+.scrim,.drawer{display:none}
+body.scr-bet .scrim{display:block;position:fixed;inset:0;z-index:8;background:rgba(20,20,58,.55)}
+body.scr-bet .drawer{display:block}
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--paper);border-top:2.5px solid var(--ink);border-radius:28px 28px 0 0;padding:10px 16px calc(14px + env(safe-area-inset-bottom))}
+.grab{width:44px;height:6px;border-radius:3px;background:var(--ink);opacity:.2;margin:0 auto 10px}
+.dh{display:flex;align-items:center;justify-content:space-between}
+.dh h3{font-family:var(--disp);font-weight:900;font-size:26px}
+.xbtn{width:40px;height:40px;border-radius:12px;border:2.5px solid var(--ink);display:grid;place-items:center;font-size:18px;box-shadow:2px 2px 0 var(--ink)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.seg button{text-align:left;padding:8px 12px;border-radius:14px;border:2.5px solid var(--ink)}
+.seg button.on{background:var(--sun);box-shadow:3px 3px 0 var(--ink)}
+.seg button:not(.on){border-style:dashed;color:#4A4F7A}
+.seg .sl{font-weight:700;font-size:13px;display:flex;align-items:center;gap:5px}
+.seg .sa{font-family:var(--disp);font-weight:800;font-size:20px;margin-top:2px}
+.read{display:flex;align-items:center;justify-content:space-between;margin:12px 0 10px;padding:8px 14px;border-radius:18px;background:#F1F2FB}
+.read .amt{font-family:var(--disp);font-weight:900;font-size:58px;line-height:1.05;letter-spacing:-.02em}
+.read .aft{text-align:right;font-size:13px;font-weight:600;color:#6B6F95;line-height:1.3}
+.read .aft b{display:block;font-family:var(--disp);font-weight:800;font-size:18px;color:var(--ink)}
+.quick{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.qc{display:grid;place-items:center}
+.allin{height:56px;padding:0 14px;border-radius:16px;border:2.5px solid var(--ink);background:var(--ink);color:var(--sun);font-family:var(--disp);font-weight:800;font-size:14px;box-shadow:3px 3px 0 var(--tomato)}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:9px 10px}
+.keys button{height:48px;border-radius:14px;border:2.5px solid var(--ink);box-shadow:2px 2px 0 var(--ink);font-family:var(--disp);font-weight:700;font-size:22px;display:grid;place-items:center;background:var(--paper)}
+.keys .fn{border:0;box-shadow:none;font-family:var(--ui);font-size:15px;font-weight:700;color:#4A4F7A}
+.keys .fn i{font-size:26px}
+.confirm{margin-top:12px;width:100%;height:58px;border-radius:18px;border:2.5px solid var(--ink);box-shadow:4px 4px 0 var(--ink);background:var(--tomato);color:var(--paper);font-family:var(--disp);font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* landing */
+.l-top{display:flex;align-items:center;gap:8px;padding:18px 18px 0;color:var(--paper);font-family:var(--disp);font-weight:800;font-size:18px}
+.l-hero{position:relative;height:318px;margin-top:4px}
+.l-hero h1{position:absolute;left:18px;top:22px;font-family:var(--disp);font-weight:900;font-size:40px;line-height:1.02;color:var(--paper);letter-spacing:-.02em;z-index:2}
+.l-hero h1 span{display:block}
+.l-hero .sub{position:absolute;left:18px;right:40px;top:120px;color:var(--paper);font-size:16px;line-height:1.4;font-weight:500;opacity:.9;z-index:2}
+.l-hero h1 .y{color:var(--sun)}
+.l-art{position:absolute;left:0;right:0;bottom:6px;display:flex;align-items:flex-end;justify-content:center;z-index:1}
+.l-art svg + svg{margin-left:-14px}
+.l-art .tilt{transform:rotate(-10deg) translateY(-6px)}
+.l-body{padding:0 16px}
+.cta{width:100%;height:60px;border-radius:18px;border:2.5px solid var(--ink);box-shadow:4px 4px 0 var(--ink);background:var(--sun);font-family:var(--disp);font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;gap:9px}
+.cta i{font-size:22px}
+.joinrow{display:flex;gap:10px;margin-top:14px}
+.joinrow label{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:56px;padding:0 14px;border-radius:16px;border:2.5px solid var(--ink);background:var(--paper)}
+.joinrow label i{font-size:20px;color:#6B6F95}
+.joinrow input{flex:1;min-width:0;border:0;outline:0;background:none;font-family:var(--disp);font-weight:700;font-size:16px;color:var(--ink);letter-spacing:.04em}
+.joinrow input::placeholder{font-family:var(--ui);font-weight:500;color:#8A8EB0;letter-spacing:0;font-size:16px}
+.joinrow button{height:56px;padding:0 20px;border-radius:16px;border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink);background:var(--tomato);color:var(--paper);font-family:var(--disp);font-weight:800;font-size:16px}
+.rgs{display:flex;flex-direction:column;gap:10px}
+.rg{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:18px}
+.rg .m{flex:1;min-width:0}
+.rg .t{font-weight:700;font-size:16px;display:flex;align-items:center;gap:7px}
+.rg .s{font-size:13px;color:#5D6188;margin-top:2px;font-weight:500}
+.rg .s .c{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.03em;color:var(--ink)}
+.rg .r{text-align:right}
+.rg .r .v{font-family:var(--disp);font-weight:800;font-size:18px}
+.delta{display:inline-block;font-weight:800;font-size:12px;padding:2px 6px;border-radius:6px;border:1.5px solid var(--ink);margin-top:3px}
+.delta.up{background:var(--mint)}.delta.down{background:var(--pink)}
+.lv{font-size:10.5px;font-weight:800;letter-spacing:.05em;padding:3px 6px;border-radius:6px;background:var(--mint);border:1.5px solid var(--ink)}
+</style>
+</head>
+<body class="scr-game">
+
+<main class="game">
+  <header class="top">
+    <button class="ticket" aria-label="Share room code"><span class="cd">7B2E 41C9</span><span class="sh"><i class="ph-bold ph-export"></i></span></button>
+    <div class="live"><span class="dot"></span>Live</div>
+  </header>
+
+  <section class="card you">
+    <div class="who">Maya <span class="badge b-you">YOU</span></div>
+    <div class="big">1,240</div>
+    <div class="lbl">your stack</div>
+    <div class="tower" data-tower="you"></div>
+  </section>
+
+  <section class="pots">
+    <div class="card pot"><div class="pl">Main pot</div><div class="pa">360</div><div class="pile" data-tower="main"></div></div>
+    <div class="card pot side"><div class="pl">Side pot 1</div><div class="pa">150</div><div class="pile" data-tower="side"></div></div>
+  </section>
+
+  <div class="sech"><h2>At the table</h2><span>6 players</span></div>
+  <section class="grid">
+    <div class="pc"><div class="r1"><span data-av="A" data-c="pink"></span><span class="badge b-host"><i class="ph-fill ph-crown-simple"></i>HOST</span></div><div class="nm">Ana</div><div class="st">685</div></div>
+    <div class="pc"><div class="r1"><span data-av="B" data-c="sky"></span></div><div class="nm">Ben</div><div class="st">1,105</div></div>
+    <div class="pc"><div class="r1"><span data-av="C" data-c="lilac"></span></div><div class="nm">Cara</div><div class="st">1,580</div></div>
+    <div class="pc away"><div class="r1"><span data-av="D" data-c="mist"></span><span class="badge b-away">AWAY</span></div><div class="nm">Dev</div><div class="st">400</div></div>
+    <div class="pc"><div class="r1"><span data-av="E" data-c="mint"></span></div><div class="nm">Eli</div><div class="st">480</div></div>
+    <button class="pc invite"><i class="ph-bold ph-user-plus"></i>Invite</button>
+  </section>
+
+  <section class="card feed">
+    <div class="ev"><span class="ic bet"><i class="ph-fill ph-poker-chip"></i></span><span class="t"><b>Ben</b> bet <span class="n">50</span> into main</span><button class="undo"><i class="ph-bold ph-arrow-u-up-left"></i>Undo</button></div>
+    <div class="ev"><span class="ic bet"><i class="ph-fill ph-poker-chip"></i></span><span class="t"><b>Eli</b> bet <span class="n">50</span> into main</span><span class="tm">1m</span></div>
+    <div class="ev"><span class="ic win"><i class="ph-fill ph-trophy"></i></span><span class="t"><b>Cara</b> won the main pot <span class="n">420</span></span><span class="tm">4m</span></div>
+  </section>
+</main>
+
+<nav class="actionbar">
+  <button class="act bet"><i class="ph-fill ph-poker-chip"></i>Bet</button>
+  <button class="act win"><i class="ph-fill ph-hand-coins"></i>Win</button>
+  <button class="act more" aria-label="More"><i class="ph-bold ph-dots-three-outline"></i></button>
+</nav>
+
+<div class="scrim"></div>
+<section class="drawer" role="dialog" aria-label="Bet">
+  <div class="grab"></div>
+  <div class="dh"><h3>Bet</h3><button class="xbtn" aria-label="Close"><i class="ph-bold ph-x"></i></button></div>
+  <div class="seg">
+    <button class="on"><div class="sl"><i class="ph-fill ph-check-circle"></i>Main pot</div><div class="sa">360</div></button>
+    <button><div class="sl">Side pot 1</div><div class="sa">150</div></button>
+  </div>
+  <div class="read">
+    <div class="amt">125</div>
+    <div class="aft">Your stack after<b>1,115</b></div>
+  </div>
+  <div class="quick">
+    <span class="qc" data-q="5" data-c="tomato"></span>
+    <span class="qc" data-q="25" data-c="mint"></span>
+    <span class="qc" data-q="100" data-c="ink"></span>
+    <span class="qc" data-q="500" data-c="lilac"></span>
+    <button class="allin">All-in</button>
+  </div>
+  <div class="keys">
+    <button>1</button><button>2</button><button>3</button>
+    <button>4</button><button>5</button><button>6</button>
+    <button>7</button><button>8</button><button>9</button>
+    <button class="fn">Clear</button><button>0</button><button class="fn" aria-label="Delete"><i class="ph-bold ph-backspace"></i></button>
+  </div>
+  <button class="confirm"><i class="ph-fill ph-poker-chip"></i>Bet 125 into main pot</button>
+</section>
+
+<main class="landing">
+  <div class="l-top"><span data-av="" data-c="tomato" data-size="30"></span>pokerchips</div>
+  <div class="l-hero">
+    <h1><span>No chips?</span><span class="y">No problem.</span></h1>
+    <p class="sub">Track every bet, pot and payout at your home game, from everyone's phone.</p>
+    <div class="l-art" data-tower="hero"></div>
+  </div>
+  <div class="l-body">
+    <button class="cta"><i class="ph-bold ph-plus-circle"></i>Create a game</button>
+    <div class="joinrow">
+      <label><i class="ph-bold ph-hash"></i><input placeholder="Enter game code" autocapitalize="characters"></label>
+      <button>Join</button>
+    </div>
+    <div class="sech" style="margin:22px 2px 10px"><h2>Recent games</h2></div>
+    <div class="rgs">
+      <div class="card rg"><span data-av="A" data-c="pink"></span><div class="m"><div class="t">Ana's table <span class="lv">LIVE</span></div><div class="s"><span class="c">7B2E 41C9</span> with 6 players</div></div><div class="r"><div class="v">1,240</div><span class="delta up">+240</span></div></div>
+      <div class="card rg"><span data-av="M" data-c="sun"></span><div class="m"><div class="t">Your table</div><div class="s"><span class="c">3F0A 92D7</span> on Sep 27</div></div><div class="r"><div class="v">2,050</div><span class="delta up">+1,050</span></div></div>
+      <div class="card rg"><span data-av="B" data-c="sky"></span><div class="m"><div class="t">Ben's table</div><div class="s"><span class="c">C81E 5B60</span> on Sep 14</div></div><div class="r"><div class="v">640</div><span class="delta down">&minus;360</span></div></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const K={tomato:'#FF5B3D',sun:'#FFD23F',mint:'#2CCB7F',pink:'#FF9BD2',sky:'#A8D8FF',lilac:'#9C7BFF',ink:'#14143A',paper:'#FFFFFF',mist:'#C9CFF5'};
+const INK='#14143A';
+function shade(hex,f){const n=parseInt(hex.slice(1),16);return `rgb(${Math.round((n>>16)*f)},${Math.round(((n>>8)&255)*f)},${Math.round((n&255)*f)})`}
+// Cartoon side-view stack, ink-outlined; colors bottom to top; jitter gives the hand-stacked wobble.
+function stack(colors,w,jit){
+  const th=w*0.2, ry=w*0.26, pad=3, H=Math.ceil(colors.length*th+ry*2+pad*2), W=w+pad*2+8;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  colors.forEach((c,i)=>{
+    const col=K[c]||c, dx=pad+4+(jit?jit[i%jit.length]:0), yc=H-pad-ry-(i+1)*th;
+    const mark=c==='paper'||c==='sun'||c==='sky'||c==='mist'?INK:'#fff';
+    s+=`<path d="M${dx} ${yc} v${th} A${w/2} ${ry} 0 0 0 ${dx+w} ${yc+th} v${-th} z" fill="${shade(col,.82)}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    for(const fx of [0.2,0.5,0.8]){const x=fx*w,e=ry*Math.sqrt(1-Math.pow((x-w/2)/(w/2),2));s+=`<rect x="${dx+x-w*0.05}" y="${yc+e+1}" width="${w*0.1}" height="${th-2}" fill="${mark}" opacity=".9"/>`}
+    s+=`<ellipse cx="${dx+w/2}" cy="${yc}" rx="${w/2}" ry="${ry}" fill="${col}" stroke="${INK}" stroke-width="2.2"/>`;
+    s+=`<ellipse cx="${dx+w/2}" cy="${yc}" rx="${w*0.3}" ry="${ry*0.58}" fill="none" stroke="${mark}" stroke-opacity=".75" stroke-width="2" stroke-dasharray="4 4"/>`;
+  });
+  return s+'</svg>';
+}
+// Top-down chip used as an avatar or a quick-add button.
+function chip(color,label,size,txt){
+  const col=K[color]||color, mark=(color==='paper'||color==='sun'||color==='sky'||color==='mist')?INK:'#fff';
+  let s=`<svg width="${size}" height="${size}" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="${col}" stroke="${INK}" stroke-width="6"/>`;
+  for(let k=0;k<8;k++) s+=`<rect x="45" y="6" width="10" height="13" rx="2" fill="${mark}" transform="rotate(${k*45} 50 50)"/>`;
+  s+=`<circle cx="50" cy="50" r="${size>40?31:27}" fill="${color==='ink'?'#2A2A60':'#fff'}" stroke="${INK}" stroke-width="5"/>`;
+  if(label) s+=`<text x="50" y="${label.length>3?56:(label.length>2?57:61)}" text-anchor="middle" font-family="Unbounded, sans-serif" font-weight="800" font-size="${label.length>3?16:(label.length>2?21:28)}" fill="${txt|| (color==='ink'?'#FFD23F':INK)}">${label}</text>`;
+  return s+'</svg>';
+}
+const towers={
+  you:[['mint','ink','tomato','paper','paper'],['lilac','ink','ink','mint','tomato','tomato','paper','sun','tomato']],
+  main:[['ink','mint','tomato','tomato','paper','tomato']],
+  side:[['mint','tomato','paper']],
+  hero:[['tomato','paper','sun','tomato'],['ink','tomato','mint','tomato','paper','tomato','mint'],['lilac','ink','mint','mint','tomato','sun','tomato','paper','tomato','mint'],['mint','ink','tomato','paper','tomato'],['tomato','sun','ink']],
+};
+const sizes={you:38,main:30,side:28,hero:54};
+const jits={you:[0,2,-1,3,-2,1,0,-3,2],hero:[0,3,-3,2,-4,3,0,-2,4,-1],main:[0,2,-1,1,-2,2],side:[0,-2,1]};
+document.querySelectorAll('[data-tower]').forEach(el=>{const k=el.dataset.tower;el.innerHTML=towers[k].map(t=>stack(t,sizes[k],jits[k])).join('');});
+document.querySelectorAll('[data-av]').forEach(el=>{el.innerHTML=chip(el.dataset.c,el.dataset.av,+(el.dataset.size||34))});
+document.querySelectorAll('[data-q]').forEach(el=>{el.innerHTML=chip(el.dataset.c,'+'+el.dataset.q,58)});
+const scr=(location.hash||'#game').slice(1); document.body.className='scr-'+scr;
+</script>
+</body>
+</html>

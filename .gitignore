@@ -1,0 +1,12 @@
+node_modules/
+*.log
+
+# Build and test output
+client/dist/
+.wrangler/
+/test-results/
+/playwright-report/
+
+# Version 2's local data file, if an old checkout left one
+rooms-data.json
+data/
