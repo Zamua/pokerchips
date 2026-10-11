@@ -2,6 +2,7 @@ import { SELF, env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare
 import { describe, expect, it } from 'vitest';
 import { IDLE_LIFETIME_MS } from '../domain/values.js';
 import type { ServerFrame, TableView } from '../protocol/frames.js';
+import type { TableService } from '../app/tableService.js';
 
 const BASE = 'https://pokerchips.test';
 
@@ -273,5 +274,70 @@ describe('moving a version 2 room in', () => {
     const c = await Client.seated(code, ben.seatKey);
     const welcome = c.frames.find((f) => f.t === 'welcome') as Extract<ServerFrame, { t: 'welcome' }>;
     expect(stackOf(welcome.state, 'Ben')).toBe(1100);
+  });
+});
+
+describe('storage cost', () => {
+  type Cell = {
+    service: Pick<TableService, 'command' | 'view'> & { store: { storage: DurableObjectStorage } };
+  };
+
+  /** SQLite rows the cell's store reads while `body` runs. */
+  function rowsRead(cell: Cell, body: () => void): number {
+    const store = cell.service.store;
+    const real = store.storage;
+    const cursors: SqlStorageCursor<Record<string, SqlStorageValue>>[] = [];
+    store.storage = {
+      sql: { exec: (query: string, ...args: unknown[]) => cursors[cursors.push(real.sql.exec(query, ...args)) - 1] },
+      transactionSync: <T>(fn: () => T) => real.transactionSync(fn),
+    } as unknown as DurableObjectStorage;
+    try {
+      body();
+    } finally {
+      store.storage = real;
+    }
+    return cursors.reduce((sum, c) => sum + c.rowsRead, 0);
+  }
+
+  const storedTail = (storage: DurableObjectStorage) =>
+    storage.sql
+      .exec<{ json: string }>('SELECT json FROM ledger ORDER BY seq DESC LIMIT 50')
+      .toArray()
+      .map((r) => JSON.parse(r.json))
+      .reverse();
+
+  it('reads a handful of rows per command, however long the ledger and however many answers a seat holds', async () => {
+    const t = await openTable('Ana', 1_000_000);
+    const b = await joinTable(t.code, 'Ben');
+    const reads = await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (instance, state) => {
+      const cell = instance as unknown as Cell;
+      const bet = (i: number, op: string) => cell.service.command(i % 2 ? t.seatId : b.seatId, op, { type: 'bet', pot: 'main', amount: 1 });
+      const tenBets = (tag: string) => Array.from({ length: 10 }, (_, i) => rowsRead(cell, () => bet(i, `${tag}${i}`)));
+      const early = tenBets('early');
+      for (let i = 0; i < 300; i++) bet(i, `warm${i}`);
+      const late = tenBets('late');
+      const repeated = rowsRead(cell, () => bet(9, 'late9'));
+      expect(cell.service.view()!.ledger).toEqual(storedTail(state.storage));
+      return { early, late, repeated };
+    });
+    expect(Math.max(...reads.early)).toBeLessThanOrEqual(5);
+    expect(Math.max(...reads.late)).toBeLessThanOrEqual(5);
+    expect(reads.repeated).toBe(1);
+  });
+
+  it('never shows an entry whose write rolled back', async () => {
+    const t = await openTable();
+    await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (instance, state) => {
+      const cell = instance as unknown as Cell;
+      const bet = (op: string) => cell.service.command(t.seatId, op, { type: 'bet', pot: 'main', amount: 1 });
+      bet('a');
+      const next = cell.service.view()!.seq + 1;
+      state.storage.sql.exec('INSERT INTO ledger (seq, json) VALUES (?, ?)', next, '{}');
+      expect(() => bet('b')).toThrow();
+      state.storage.sql.exec('DELETE FROM ledger WHERE seq = ?', next);
+      expect(cell.service.view()!.ledger).toEqual(storedTail(state.storage));
+      expect(bet('c')).toEqual({ t: 'ack', op: 'c', seq: next });
+      expect(cell.service.view()!.ledger).toEqual(storedTail(state.storage));
+    });
   });
 });

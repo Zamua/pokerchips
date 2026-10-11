@@ -112,7 +112,7 @@ export class TableService {
   }
 
   view(table = this.store.load()): TableView | null {
-    return table && viewOf(table, this.store.ledgerTail(LEDGER_TAIL));
+    return table && viewOf(table, this.store.ledgerTail());
   }
 
   private seat(o: Outcome, seatKey: string): Seated {
