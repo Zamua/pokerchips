@@ -44,6 +44,25 @@ describe('betting with chips', () => {
     expect(held(b)).toBe(1_000);
   });
 
+  it('gives back the starting tray on reset, however chips were broken', () => {
+    const start = startBet(1_000, V);
+    const fives = Array.from({ length: 12 }, () => ({ t: 'throw' as const, value: 5 }));
+    const b = run(start, ...fives, { t: 'throw', value: 100 }, { t: 'throw', value: 100 }, { t: 'throw', value: 100 }, { t: 'throw', value: 100 });
+    expect(b.tray).not.toEqual(start.tray);
+    expect(bet(b, { t: 'reset' }).tray).toEqual(start.tray);
+  });
+
+  it('colors up chips that come back on undo, leaving stacks at their share alone', () => {
+    const start = startBet(1_000, V);
+    const fives = Array.from({ length: 11 }, () => ({ t: 'throw' as const, value: 5 }));
+    const undos = Array.from({ length: 11 }, () => ({ t: 'undo' as const }));
+    expect(run(start, ...fives, ...undos).tray).toEqual(start.tray);
+
+    const hundreds = run(start, { t: 'throw', value: 100 }, { t: 'throw', value: 100 }, { t: 'throw', value: 100 });
+    expect(bet(hundreds, { t: 'undo' }).tray).toEqual({ 5: 10, 25: 6, 100: 6, 500: 0 });
+    expect(run(hundreds, { t: 'undo' }, { t: 'undo' }).tray).toEqual({ 5: 10, 25: 6, 100: 2, 500: 1 });
+  });
+
   it('refuses a chip the tray has none of', () => {
     const b = startBet(400, [100, 500]);
     expect(b.tray[500]).toBe(0);
@@ -86,6 +105,20 @@ describe('betting with chips', () => {
     const b = run(startBet(1_000, V), { t: 'throw', value: 100 }, { t: 'restart', stack: 650 });
     expect(b).toMatchObject({ amount: 0, thrown: [], tray: assortment(650, V) });
     expect(bet(b, { t: 'throw', value: 5 }).thrown[0].id).toBeGreaterThan(1);
+  });
+
+  it('keeps tray and pot adding up to the stack through any run of actions', () => {
+    let seed = 7;
+    const rand = (n: number) => (seed = (seed * 48_271) % 2_147_483_647) % n;
+    for (const stack of [1_000, 653, 12_340]) {
+      let b = startBet(stack, V);
+      for (let i = 0; i < 400; i++) {
+        const k = rand(10);
+        b = bet(b, k < 6 ? { t: 'throw', value: V[rand(4)] } : k < 8 ? { t: 'undo' } : k < 9 ? { t: 'set', amount: rand(stack) } : { t: 'reset' });
+        expect(held(b)).toBe(stack);
+        expect(Object.values(b.tray).every((n) => n >= 0)).toBe(true);
+      }
+    }
   });
 
   it('gives every chip its own id, never reused', () => {

@@ -57,6 +57,9 @@ test('the tray is the stack in chips, and a used-up value gets change from a lar
   for (let i = 0; i < 5; i++) await chip('100').click();
   await expect(readout).toHaveText('800');
   await expect(chip('100')).toBeDisabled();
+  await drawer.getByRole('button', { name: 'Reset' }).click();
+  await left('100', 3);
+  await left('500', 1);
 });
 
 test('a typed bet puts its chips in, Reset takes them back, and typing is remembered', async ({ page }) => {

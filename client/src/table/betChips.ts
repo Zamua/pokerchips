@@ -91,6 +91,29 @@ function breakFor(t: Tray, value: number, values: readonly number[]): Tray | nul
   return add({ ...t, [bigger]: t[bigger] - 1 }, changeFor(bigger, values));
 }
 
+const worth = (t: Tray) => Object.entries(t).reduce((n, [v, c]) => n + Number(v) * c, 0);
+
+/**
+ * Swaps extra small chips for larger ones: wherever a stack holds more than
+ * its share of a fresh buy-in by a whole larger chip's worth, keeping at
+ * least one chip in each of the tray's own stacks.
+ */
+function colorUp(t: Tray, values: readonly number[]): Tray {
+  const share = assortment(worth(t), values);
+  const out = { ...t };
+  for (const v of [...new Set([...Object.keys(out).map(Number), ...values])].sort((a, b) => a - b)) {
+    const up = values.filter((u) => u > v && u % v === 0).sort((a, b) => a - b)[0];
+    if (up === undefined) continue;
+    const per = up / v;
+    const keep = Math.max(share[v] ?? 0, values.includes(v) ? 1 : 0);
+    while ((out[v] ?? 0) - per >= keep) {
+      out[v] -= per;
+      out[up] = (out[up] ?? 0) + 1;
+    }
+  }
+  return out;
+}
+
 /** Refills each of the tray's values that ran out, breaking larger chips. */
 function refill(t: Tray, values: readonly number[]): Tray {
   let out = t;
@@ -151,10 +174,10 @@ export function bet(b: Bet, a: BetAction): Bet {
     case 'undo': {
       const last = b.thrown.at(-1);
       if (!last) return { ...b, amount: 0 };
-      return { ...b, amount: Math.max(0, b.amount - last.value), thrown: b.thrown.slice(0, -1), tray: add(b.tray, { [last.value]: 1 }) };
+      return { ...b, amount: Math.max(0, b.amount - last.value), thrown: b.thrown.slice(0, -1), tray: colorUp(add(b.tray, { [last.value]: 1 }), b.values) };
     }
     case 'reset':
-      return { ...b, amount: 0, thrown: [], tray: b.thrown.reduce((t, c) => add(t, { [c.value]: 1 }), b.tray) };
+      return { ...b, amount: 0, thrown: [], tray: assortment(worth(b.tray) + b.thrown.reduce((n, c) => n + c.value, 0), b.values) };
     case 'restart':
       return { ...startBet(a.stack, b.values), next: b.next };
     case 'set': {
@@ -168,7 +191,7 @@ export function bet(b: Bet, a: BetAction): Bet {
       });
       let next = b.next;
       for (const value of taken) thrown.push({ id: next++, value });
-      return { ...b, amount: a.amount, thrown, tray: refill(left, b.values), next };
+      return { ...b, amount: a.amount, thrown, tray: refill(colorUp(left, b.values), b.values), next };
     }
   }
 }
