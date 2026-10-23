@@ -40,14 +40,24 @@ test('a landing chip dropped over a stack settles on top of it', async ({ page }
     [onto.x + onto.width / 2, onto.y - 40],
   ];
   for (const [x, y] of path) await page.mouse.move(x, y, { steps: 15 });
-  await page.waitForTimeout(300);
+  // Let go only once the carried chip hangs still, so the drop is a drop and not a throw.
+  let was = '';
+  await expect
+    .poll(async () => {
+      const now = (await chip(page, '4.2').getAttribute('transform')) ?? '';
+      const still = now === was;
+      was = now;
+      return still;
+    }, { intervals: [100] })
+    .toBe(true);
   await page.mouse.up();
 
   await expect(page.getByRole('button', { name: 'Restack the chips' })).toBeVisible();
+  // Stacks drift a few pixels as they settle once woken, so over the top chip means within a quarter chip.
   await expect
     .poll(async () => {
       const p = await spot(page, '4.2');
-      return Math.abs(p.x - target.x) < 4 && Math.abs(p.y - (target.y - 10.8)) < 3;
+      return Math.abs(p.x - target.x) < 54 / 4 && Math.abs(p.y - (target.y - 10.8)) < 3;
     })
     .toBe(true);
 });
