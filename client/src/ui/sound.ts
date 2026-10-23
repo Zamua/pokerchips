@@ -70,30 +70,35 @@ export function playChips(): void {
 }
 
 /**
- * A two-note "uh-uh" for a tap that cannot do anything, synthesized so it
- * needs no file. Square waves above 240 Hz, filtered, so phone speakers play
- * it about as loud as the chip sound.
+ * A short buzzy "ee-err" for a tap that cannot do anything, synthesized so it
+ * needs no file: two detuned sawtooths per note, the second sliding down,
+ * filtered, at about the chip sound's loudness.
  */
 export function playNope(): void {
   if (!ctx || ctx.state !== 'running') return;
   const c = ctx;
   const tone = c.createBiquadFilter();
   tone.type = 'lowpass';
-  tone.frequency.value = 2_000;
+  tone.frequency.value = 2_600;
   tone.connect(c.destination);
-  const note = (freq: number, at: number, length: number) => {
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-    osc.type = 'square';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(0.35, at + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + length);
-    osc.connect(gain).connect(tone);
-    osc.start(at);
-    osc.stop(at + length);
+  const note = (from: number, to: number, at: number, length: number) => {
+    for (const cents of [-9, 9]) {
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = 'sawtooth';
+      osc.detune.value = cents;
+      osc.frequency.setValueAtTime(from, at);
+      osc.frequency.linearRampToValueAtTime(to, at + length);
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(0.16, at + 0.008);
+      gain.gain.setValueAtTime(0.16, at + length - 0.03);
+      gain.gain.linearRampToValueAtTime(0, at + length);
+      osc.connect(gain).connect(tone);
+      osc.start(at);
+      osc.stop(at + length);
+    }
   };
   const t = c.currentTime;
-  note(330, t, 0.09);
-  note(247, t + 0.1, 0.14);
+  note(440, 440, t, 0.09);
+  note(311, 262, t + 0.11, 0.17);
 }
