@@ -71,18 +71,30 @@ export function playChips(): void {
 
 /**
  * A short buzzy "ee-err" for a tap that cannot do anything, synthesized so it
- * needs no file: two detuned sawtooths per note, the second sliding down,
- * filtered, at about the chip sound's loudness.
+ * needs no file: three detuned sawtooths per note, the second sliding down,
+ * chopped by a 32 Hz square for the buzz, at about the chip sound's loudness.
  */
 export function playNope(): void {
   if (!ctx || ctx.state !== 'running') return;
   const c = ctx;
+  const t = c.currentTime;
   const tone = c.createBiquadFilter();
   tone.type = 'lowpass';
-  tone.frequency.value = 2_600;
+  tone.frequency.value = 3_500;
   tone.connect(c.destination);
+  const buzz = c.createGain();
+  buzz.gain.value = 0.6;
+  buzz.connect(tone);
+  const lfo = c.createOscillator();
+  lfo.type = 'square';
+  lfo.frequency.value = 32;
+  const depth = c.createGain();
+  depth.gain.value = 0.4;
+  lfo.connect(depth).connect(buzz.gain);
+  lfo.start(t);
+  lfo.stop(t + 0.3);
   const note = (from: number, to: number, at: number, length: number) => {
-    for (const cents of [-9, 9]) {
+    for (const cents of [-15, 0, 15]) {
       const osc = c.createOscillator();
       const gain = c.createGain();
       osc.type = 'sawtooth';
@@ -93,12 +105,11 @@ export function playNope(): void {
       gain.gain.linearRampToValueAtTime(0.16, at + 0.008);
       gain.gain.setValueAtTime(0.16, at + length - 0.03);
       gain.gain.linearRampToValueAtTime(0, at + length);
-      osc.connect(gain).connect(tone);
+      osc.connect(gain).connect(buzz);
       osc.start(at);
       osc.stop(at + length);
     }
   };
-  const t = c.currentTime;
-  note(440, 440, t, 0.09);
-  note(311, 262, t + 0.11, 0.17);
+  note(294, 294, t, 0.09);
+  note(208, 175, t + 0.11, 0.17);
 }
