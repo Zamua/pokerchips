@@ -57,6 +57,9 @@ test('the tray is the stack in chips, and a used-up value gets change from a lar
   for (let i = 0; i < 5; i++) await chip('100').click();
   await expect(readout).toHaveText('800');
   await expect(chip('100')).toBeDisabled();
+  await chip('100').click({ force: true });
+  expect(await chip('100').evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
+  await expect(readout).toHaveText('800');
   await drawer.getByRole('button', { name: 'Reset' }).click();
   await left('100', 3);
   await left('500', 1);
@@ -96,6 +99,10 @@ test('All-in puts the whole stack in', async ({ page }) => {
   await expect(readout).toHaveText('1,000');
   await expect(drawer.getByRole('button', { name: 'Bet 1,000 into main pot' })).toBeEnabled();
   for (const v of ['5', '25', '100', '500']) await expect(chip(v)).toBeDisabled();
+  const allIn = drawer.getByRole('button', { name: 'All-in' });
+  await allIn.click();
+  expect(await allIn.evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
+  await expect(readout).toHaveText('1,000');
 });
 
 test('a drawer closes with a swipe down from anywhere in it', async ({ page, browserName }) => {

@@ -5,7 +5,7 @@ import type { Key } from '../ui/amount.js';
 import { ChipSide, Stack } from '../ui/Chip.js';
 import { compact, Keypad, lengthClass, press } from '../ui/Drawer.js';
 import { reducedMotion } from '../ui/motion.js';
-import { playChips } from '../ui/sound.js';
+import { playChips, playNope } from '../ui/sound.js';
 import { chips, DENOMINATIONS } from '../ui/text.js';
 import { chipColor, chipSize } from '../ui/towers.js';
 import { type Bet, type BetAction, FELT_CAP, stacksOf } from './betChips.js';
@@ -163,12 +163,19 @@ export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
     else sc.back(g.value, r);
   };
 
-  const tap = (value: number) => {
+  /** A tap that cannot put anything in says so: a refusal sound and a shake. */
+  const nope = (el: HTMLElement) => {
+    playNope();
+    if (!reducedMotion()) el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(-2px)' }, { transform: 'translateX(0)' }], 220);
+  };
+
+  const tap = (value: number, el: HTMLElement) => {
     if (dragged.current) {
       dragged.current = false;
       return;
     }
-    put(value);
+    if (!b.tray[value]) nope(el);
+    else put(value);
   };
 
   const onKey = useCallback((k: Key) => dispatch({ t: 'set', amount: press(b.amount, k) }), [b.amount, dispatch]);
@@ -221,13 +228,13 @@ export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
                 key={v}
                 className="tray-stack"
                 data-drag
-                disabled={count === 0}
+                aria-disabled={count === 0}
                 aria-label={`Put in a ${chips(v)} chip, ${count} left`}
-                onPointerDown={down(v)}
+                onPointerDown={count === 0 ? undefined : down(v)}
                 onPointerMove={move}
                 onPointerUp={up}
                 onPointerCancel={up}
-                onClick={() => tap(v)}
+                onClick={(e) => tap(v, e.currentTarget)}
               >
                 <span
                   className="tray-chips"
@@ -250,7 +257,8 @@ export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
           })}
           <button
             className="allin"
-            onClick={() => {
+            onClick={(e) => {
+              if (b.amount >= stack) return nope(e.currentTarget);
               dispatch({ t: 'set', amount: stack });
               playChips();
             }}

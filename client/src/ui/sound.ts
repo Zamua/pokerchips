@@ -68,3 +68,24 @@ export function playChips(): void {
   src.connect(gain).connect(ctx.destination);
   src.start(0);
 }
+
+/** A soft two-note "uh-uh" for a tap that cannot do anything; synthesized, so it needs no file. */
+export function playNope(): void {
+  if (!ctx || ctx.state !== 'running') return;
+  const c = ctx;
+  const note = (freq: number, at: number, length: number) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(0.28, at + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + length);
+    osc.connect(gain).connect(c.destination);
+    osc.start(at);
+    osc.stop(at + length);
+  };
+  const t = c.currentTime;
+  note(196, t, 0.08);
+  note(147, t + 0.09, 0.12);
+}

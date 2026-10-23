@@ -2051,11 +2051,11 @@ input {
   gap: 6px;
 }
 
-.tray-stack:disabled {
+.tray-stack[aria-disabled='true'] {
   opacity: 0.35;
 }
 
-.tray-stack:active:not(:disabled) .tray-chips {
+.tray-stack:active:not([aria-disabled='true']) .tray-chips {
   transform: translateY(2px);
 }
 
