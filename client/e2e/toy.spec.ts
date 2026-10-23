@@ -50,15 +50,22 @@ test('a landing chip dropped over a stack settles on top of it', async ({ page }
       return still;
     }, { intervals: [100] })
     .toBe(true);
+  console.log('DIAG held', was, 'target', JSON.stringify(target));
   await page.mouse.up();
 
   await expect(page.getByRole('button', { name: 'Restack the chips' })).toBeVisible();
-  await expect
-    .poll(async () => {
-      const p = await spot(page, '4.2');
-      return Math.abs(p.x - target.x) < 4 && Math.abs(p.y - (target.y - 10.8)) < 3;
-    })
-    .toBe(true);
+  try {
+    await expect
+      .poll(async () => {
+        const p = await spot(page, '4.2');
+        return Math.abs(p.x - target.x) < 4 && Math.abs(p.y - (target.y - 10.8)) < 3;
+      })
+      .toBe(true);
+  } catch (e) {
+    const all = await page.locator('.toy use').evaluateAll((us) => us.map((u) => `${u.getAttribute('data-chip')}=${u.getAttribute('transform')}`).join(' '));
+    console.log('DIAG after', all);
+    throw e;
+  }
 });
 
 test('the landing chips stay still under reduced motion', async ({ page }) => {
