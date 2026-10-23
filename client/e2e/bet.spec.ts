@@ -62,6 +62,17 @@ test('the tray is the stack in chips, and a used-up value gets change from a lar
   await left('500', 1);
 });
 
+test('the drawer keeps its size as chips go in and come back', async ({ page }) => {
+  await openTable(page, 'Maya');
+  const { drawer, chip } = await openBet(page);
+  const before = await drawer.boundingBox();
+  await chip('5').click();
+  await chip('25').click();
+  expect(await drawer.boundingBox()).toEqual(before);
+  await drawer.getByRole('button', { name: 'Reset' }).click();
+  expect(await drawer.boundingBox()).toEqual(before);
+});
+
 test('a typed bet puts its chips in, Reset takes them back, and typing is remembered', async ({ page }) => {
   await openTable(page, 'Maya');
   const { drawer, readout } = await openBet(page);

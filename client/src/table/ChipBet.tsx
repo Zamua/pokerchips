@@ -53,6 +53,9 @@ export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
   const [held, setHeld] = useState<number | null>(null);
   const size = chipSize(W);
   const over = b.amount > stack;
+  /** Every tray stack keeps the height of a full one, so the drawer never changes size as chips go in. */
+  const stackHeight = (n: number) => Math.ceil(Math.min(n, TALL) * size.th + 2 * size.ry + 6);
+  const trayHeight = stackHeight(TALL);
   const text = chips(b.amount);
 
   useEffect(() => {
@@ -228,19 +231,30 @@ export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
               >
                 <span
                   className="tray-chips"
+                  style={{ height: trayHeight }}
                   ref={(el) => {
                     if (el) stacks.current.set(v, el);
                     else stacks.current.delete(v);
                   }}
                 >
                   {n > 0 ? <Stack colors={Array(Math.min(n, TALL)).fill(chipColor(v))} width={W} /> : <span className="tray-empty" />}
-                  {n > 0 && <span className="tray-count">×{n}</span>}
+                  {n > 0 && (
+                    <span className="tray-count" style={{ bottom: stackHeight(n) - 8 }}>
+                      ×{n}
+                    </span>
+                  )}
                 </span>
                 <span className="tray-tag">{compact(v)}</span>
               </button>
             );
           })}
-          <button className="allin" onClick={() => dispatch({ t: 'set', amount: stack })}>
+          <button
+            className="allin"
+            onClick={() => {
+              dispatch({ t: 'set', amount: stack });
+              playChips();
+            }}
+          >
             All-in
           </button>
         </div>
