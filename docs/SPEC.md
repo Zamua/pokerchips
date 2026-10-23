@@ -206,7 +206,9 @@ Stable codes, each shown to the player as a sentence by the client:
   your whole stack. Chips coming back are colored up: a stack holding more
   than its share by a whole larger chip's worth swaps those chips for it, so
   the tray stays like a fresh buy-in of what is left, and Reset gives back
-  the tray as it started. Type swaps the tray for the keypad, and a typed amount
+  the tray as it started. A tap that cannot put anything in, on an empty
+  stack with no larger chip to break or on All-in when all in, plays a short
+  refusal sound instead. Type swaps the tray for the keypad, and a typed amount
   puts in the fewest chips the tray can give, breaking larger ones as needed.
   The drawer remembers Chips or Type on the device. Nothing is bet until the
   confirm button, which names the total, is pressed. With reduced motion the
