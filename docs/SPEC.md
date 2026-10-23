@@ -183,6 +183,11 @@ Stable codes, each shown to the player as a sentence by the client:
   open-a-table (name, buy-in presets 500, 1,000, 2,000, 5,000, 10,000 or a
   custom amount), join (code, name, and one-tap claim of an away seat), and
   the table.
+- **The landing chips** are a toy with physics: a tap topples a stack (or
+  flips a loose chip), any chip can be dragged and thrown, and a chip dropped
+  over a stack settles on top of it. Once the chips are disturbed a Restack
+  button appears that puts every chip back where it started. With reduced
+  motion the chips stay still.
 - **The table screen** shows the caller's stack largest, the pots, every
   other seat with its stack and badges (YOU, HOST, AWAY), and the newest
   ledger entries with Undo where `undoable` allows. A sticky action bar holds

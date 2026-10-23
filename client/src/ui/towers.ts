@@ -13,6 +13,18 @@ export const COLORS = {
 
 export type ChipColor = keyof typeof COLORS;
 
+/** A chip seen from the side: its width, edge thickness, and the vertical radius of its face. */
+export interface ChipSize {
+  w: number;
+  th: number;
+  ry: number;
+}
+
+export const chipSize = (w: number): ChipSize => ({ w, th: w * 0.2, ry: w * 0.26 });
+
+/** How far each chip of a drawn stack sits off the stack's line, by level. */
+export const STACK_JITTER = [0, 2, -1, 3, -2, 1, 0, -3, 2, -1, 1, -2];
+
 const LIGHT: ReadonlySet<ChipColor> = new Set(['paper', 'sun', 'sky', 'mist', 'pink']);
 
 /** The edge-mark color that reads on a chip of this color. */

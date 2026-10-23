@@ -1,25 +1,28 @@
-import { CaretRightIcon, HashIcon, PlusCircleIcon } from '@phosphor-icons/react';
-import { useMemo, useState } from 'react';
+import { ArrowCounterClockwiseIcon, CaretRightIcon, HashIcon, PlusCircleIcon } from '@phosphor-icons/react';
+import { useMemo, useRef, useState } from 'react';
 import { type RecentItem, legacy, mergeRecent } from '../store/legacy.js';
 import { recent } from '../store/recent.js';
-import { ChipTop, Stack } from '../ui/Chip.js';
+import { ChipTop } from '../ui/Chip.js';
+import { ChipToy, type ChipToyHandle } from '../ui/ChipToy.js';
 import { navigate, normalizeCode } from '../ui/route.js';
 import { chips, initial, sentence, showCode, when } from '../ui/text.js';
 import { useToast } from '../ui/Toast.js';
 import { seatColor } from '../ui/towers.js';
 import type { ChipColor } from '../ui/towers.js';
 
-const HERO: { colors: ChipColor[]; tilt?: boolean }[] = [
-  { colors: ['tomato', 'paper', 'sun', 'tomato'] },
-  { colors: ['ink', 'tomato', 'mint', 'tomato', 'paper', 'tomato', 'mint'] },
-  { colors: ['lilac', 'ink', 'mint', 'mint', 'tomato', 'sun', 'tomato', 'paper', 'tomato', 'mint'] },
-  { colors: ['mint', 'ink', 'tomato', 'paper', 'tomato'] },
-  { colors: ['tomato', 'sun', 'ink'] },
+const HERO: ChipColor[][] = [
+  ['tomato', 'paper', 'sun', 'tomato'],
+  ['ink', 'tomato', 'mint', 'tomato', 'paper', 'tomato', 'mint'],
+  ['lilac', 'ink', 'mint', 'mint', 'tomato', 'sun', 'tomato', 'paper', 'tomato', 'mint'],
+  ['mint', 'ink', 'tomato', 'paper', 'tomato'],
+  ['tomato', 'sun', 'ink'],
 ];
 
 export function Landing() {
   const toast = useToast();
   const [code, setCode] = useState('');
+  const toy = useRef<ChipToyHandle>(null);
+  const [messy, setMessy] = useState(false);
   const items = useMemo(() => mergeRecent(recent.list(), legacy.list()), []);
   const now = Date.now();
 
@@ -38,6 +41,12 @@ export function Landing() {
         <div className="l-top">
           <ChipTop color="tomato" label="" size={30} />
           pokerchips
+          {messy && (
+            <button type="button" className="restack" aria-label="Restack the chips" onClick={() => toy.current?.restack()}>
+              <ArrowCounterClockwiseIcon size={16} weight="bold" />
+              Restack
+            </button>
+          )}
         </div>
         <div className="l-hero">
           <h1>
@@ -45,11 +54,7 @@ export function Landing() {
             <span className="y">No problem.</span>
           </h1>
           <p className="sub">Track every bet, pot and payout at your home game, from everyone's phone.</p>
-          <div className="l-art" aria-hidden="true">
-            {HERO.map((s, i) => (
-              <Stack key={i} colors={s.colors} width={54} />
-            ))}
-          </div>
+          <ChipToy ref={toy} stacks={HERO} width={54} onMessy={setMessy} />
         </div>
         <div className="l-body">
           <button className="btn sun block" onClick={() => navigate({ name: 'open' })}>
