@@ -40,6 +40,10 @@ The landing's chip toy follows the same split inside the client: `ui/toy.ts`
 holds its rules (where chips rest, what a tap does, where a dropped chip
 settles), `ui/toyWorld.ts` adapts them to matter-js and is loaded on demand
 in its own chunk, and `ui/ChipToy.tsx` draws the chips and handles pointers.
+Betting with chips has the same three parts: `table/betChips.ts` (the bet as
+chips, the tray, making change), `table/feltWorld.ts` (the felt's physics, on
+demand) and `table/ChipBet.tsx` with `table/feltScene.ts` (the felt, the tray,
+and the chips flying between them).
 
 ## The table actor
 

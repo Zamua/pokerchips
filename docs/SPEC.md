@@ -195,6 +195,15 @@ Stable codes, each shown to the player as a sentence by the client:
   share, leave).
 - **Entering amounts** happens in a bottom drawer: the pot, quick chips
   derived from the buy-in, All-in, a large readout, a keypad, and confirm.
+- **Betting with chips.** The bet drawer puts your chips in a tray instead:
+  one stack per quick-chip value, holding as many chips as the rest of your
+  stack covers (at most nine). A tap on a stack, or a chip dragged up and let
+  go over the felt, puts that chip in; the felt shows the chips in and their
+  total. Undo takes back the last chip, Reset takes back all of them, and
+  All-in puts in your whole stack. Type swaps the tray for the keypad, and a
+  typed amount puts in the fewest chips that make it. The drawer remembers
+  Chips or Type on the device. Nothing is bet until the confirm button, which
+  names the total, is pressed. With reduced motion the chips appear in place.
 - **Recent tables** (code, name, seat key, last opened) are kept on the
   device. Leaving a table forgets its seat key on that device; the seat stays
   at the table, away.

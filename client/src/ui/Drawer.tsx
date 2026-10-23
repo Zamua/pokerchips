@@ -110,7 +110,7 @@ export function Readout({ amount, after }: { amount: number; after: ReactNode })
   );
 }
 
-const compact = (n: number) => (n >= 1_000 && n % 1_000 === 0 ? `${n / 1_000}K` : String(n));
+export const compact = (n: number) => (n >= 1_000 && n % 1_000 === 0 ? `${n / 1_000}K` : String(n));
 
 /** Quick chips that add their value, and one wide button at the end (All-in, All, Buy-in). */
 export function QuickChips({ values, onAdd, end }: { values: number[]; onAdd(n: number): void; end?: ReactNode }) {

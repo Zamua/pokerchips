@@ -1,15 +1,14 @@
 import Matter from 'matter-js';
+import { chipBody, chipEngine, walls } from './chipBodies.js';
 import type { ChipSize } from './towers.js';
 import { type Home, kick, type Pose, restingOn, visualAngle } from './toy.js';
 
-const { Bodies, Body, Composite, Constraint, Engine, Sleeping } = Matter;
+const { Body, Composite, Constraint, Engine, Sleeping } = Matter;
 
 const STEP = 1000 / 60;
 /** Fast enough on release to fly rather than settle; and the cap that keeps a throw from passing through chips. */
 const THROW = 4;
 const MAX_SPEED = 24;
-/** Bodies are this much narrower than the drawn chips: neighboring stacks are drawn edge to edge and must not rub. */
-const SLIM = 6;
 
 /** The chip toy's physics: a matter-js world of chips between the hero's edges. */
 export interface ToyWorld {
@@ -35,28 +34,11 @@ export interface WorldShape {
 }
 
 export function createWorld({ homes, width, height, ground, size }: WorldShape): ToyWorld {
-  const engine = Engine.create({ enableSleeping: true, positionIterations: 12, velocityIterations: 8 });
-  const T = 200;
+  const engine = chipEngine();
   /** Walls stand in a little, so a tilted chip's face stays on screen. */
   const inset = size.ry + 2;
-  const wall = (x: number, y: number, w: number, h: number) => Bodies.rectangle(x, y, w, h, { isStatic: true, friction: 0.8, restitution: 0.1 });
-  Composite.add(engine.world, [
-    wall(width / 2, ground + T / 2, width + 2 * T, T),
-    wall(width / 2, -T / 2, width + 2 * T, T),
-    wall(inset - T / 2, height / 2, T, height + 2 * T),
-    wall(width - inset + T / 2, height / 2, T, height + 2 * T),
-  ]);
-  const chips = homes.map((h) =>
-    Bodies.rectangle(h.x, h.y, size.w - SLIM, size.th, {
-      chamfer: { radius: size.th * 0.3 },
-      friction: 0.3,
-      frictionStatic: 0.5,
-      frictionAir: 0.012,
-      restitution: 0.05,
-      density: 0.002,
-      sleepThreshold: 30,
-    }),
-  );
+  Composite.add(engine.world, walls(inset, 0, width - inset, ground));
+  const chips = homes.map((h) => chipBody(h.x, h.y, size));
   Composite.add(engine.world, chips);
 
   let hand: { index: number; ox: number; oy: number; spring: Matter.Constraint } | null = null;
