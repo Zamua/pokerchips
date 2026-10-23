@@ -69,47 +69,47 @@ export function playChips(): void {
   src.start(0);
 }
 
+let hiss: AudioBuffer | null = null;
+
+/** A short buffer of white noise, made once. */
+function noise(c: Ctx): AudioBuffer {
+  if (hiss) return hiss;
+  hiss = c.createBuffer(1, Math.ceil(c.sampleRate * 0.05), c.sampleRate);
+  const d = hiss.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return hiss;
+}
+
 /**
- * A short buzzy "ee-err" for a tap that cannot do anything, synthesized so it
- * needs no file: three detuned sawtooths per note, the second sliding down,
- * chopped by a 32 Hz square for the buzz, at about the chip sound's loudness.
+ * Two soft chip clicks, like tapping an empty rack, for a tap that cannot do
+ * anything. Synthesized, so it needs no file; about the chip sound's
+ * loudness.
  */
 export function playNope(): void {
   if (!ctx || ctx.state !== 'running') return;
   const c = ctx;
-  const t = c.currentTime;
-  const tone = c.createBiquadFilter();
-  tone.type = 'lowpass';
-  tone.frequency.value = 3_500;
-  tone.connect(c.destination);
-  const buzz = c.createGain();
-  buzz.gain.value = 0.6;
-  buzz.connect(tone);
-  const lfo = c.createOscillator();
-  lfo.type = 'square';
-  lfo.frequency.value = 32;
-  const depth = c.createGain();
-  depth.gain.value = 0.4;
-  lfo.connect(depth).connect(buzz.gain);
-  lfo.start(t);
-  lfo.stop(t + 0.3);
-  const note = (from: number, to: number, at: number, length: number) => {
-    for (const cents of [-15, 0, 15]) {
-      const osc = c.createOscillator();
-      const gain = c.createGain();
-      osc.type = 'sawtooth';
-      osc.detune.value = cents;
-      osc.frequency.setValueAtTime(from, at);
-      osc.frequency.linearRampToValueAtTime(to, at + length);
-      gain.gain.setValueAtTime(0, at);
-      gain.gain.linearRampToValueAtTime(0.16, at + 0.008);
-      gain.gain.setValueAtTime(0.16, at + length - 0.03);
-      gain.gain.linearRampToValueAtTime(0, at + length);
-      osc.connect(gain).connect(buzz);
-      osc.start(at);
-      osc.stop(at + length);
-    }
+  const decay = (g: GainNode, at: number, peak: number, length: number) => {
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(peak, at + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.001 + length);
   };
-  note(294, 294, t, 0.09);
-  note(208, 175, t + 0.11, 0.17);
+  for (const at of [c.currentTime, c.currentTime + 0.09]) {
+    const tap = c.createBufferSource();
+    tap.buffer = noise(c);
+    const band = c.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 3_200;
+    band.Q.value = 6;
+    const g = c.createGain();
+    decay(g, at, 1.6, 0.045);
+    tap.connect(band).connect(g).connect(c.destination);
+    tap.start(at);
+    const ring = c.createOscillator();
+    ring.frequency.value = 2_400;
+    const rg = c.createGain();
+    decay(rg, at, 0.24, 0.04);
+    ring.connect(rg).connect(c.destination);
+    ring.start(at);
+    ring.stop(at + 0.06);
+  }
 }
