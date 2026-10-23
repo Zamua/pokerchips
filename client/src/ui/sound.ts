@@ -69,23 +69,31 @@ export function playChips(): void {
   src.start(0);
 }
 
-/** A soft two-note "uh-uh" for a tap that cannot do anything; synthesized, so it needs no file. */
+/**
+ * A two-note "uh-uh" for a tap that cannot do anything, synthesized so it
+ * needs no file. Square waves above 240 Hz, filtered, so phone speakers play
+ * it about as loud as the chip sound.
+ */
 export function playNope(): void {
   if (!ctx || ctx.state !== 'running') return;
   const c = ctx;
+  const tone = c.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = 2_000;
+  tone.connect(c.destination);
   const note = (freq: number, at: number, length: number) => {
     const osc = c.createOscillator();
     const gain = c.createGain();
-    osc.type = 'triangle';
+    osc.type = 'square';
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(0.28, at + 0.01);
+    gain.gain.linearRampToValueAtTime(0.35, at + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.001, at + length);
-    osc.connect(gain).connect(c.destination);
+    osc.connect(gain).connect(tone);
     osc.start(at);
     osc.stop(at + length);
   };
   const t = c.currentTime;
-  note(196, t, 0.08);
-  note(147, t + 0.09, 0.12);
+  note(330, t, 0.09);
+  note(247, t + 0.1, 0.14);
 }
