@@ -15,7 +15,9 @@ export default defineConfig({
   outputDir: '../../test-results',
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  workers: 1,
+  // Every test opens its own tables, so they share the one Worker safely.
+  fullyParallel: true,
+  workers: process.env.CI ? 4 : 2,
   reporter: [['list']],
   use: { baseURL: existing ?? `http://127.0.0.1:${PORT}`, trace: 'retain-on-failure' },
   projects: [
