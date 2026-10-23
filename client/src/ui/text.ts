@@ -32,7 +32,7 @@ export const potName = (id: string) => (id === 'main' ? 'main pot' : `side pot $
 /** 8-character codes read best in two groups: "7b2e41c9" shows as "7B2E 41C9". */
 export const showCode = (code: string) => `${code.slice(0, 4)} ${code.slice(4)}`.toUpperCase();
 
-const DENOMINATIONS = [1, 5, 25, 100, 500, 1_000, 5_000, 25_000, 100_000];
+export const DENOMINATIONS = [1, 5, 25, 100, 500, 1_000, 5_000, 25_000, 100_000];
 
 /** Four chip values for quick bets: the largest at most half the buy-in. */
 export function quickChips(buyIn: number): number[] {

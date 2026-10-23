@@ -27,9 +27,11 @@ export async function joinTable(page: Page, code: string, name: string): Promise
 export const myStack = (page: Page) => page.getByTestId('my-stack');
 export const pot = (page: Page, id = 'main') => page.getByTestId(`pot-${id}`);
 
-/** Types an amount on the drawer's keypad. */
+/** Types an amount on the drawer's keypad, switching a chip bet to typing first. */
 export async function keypad(page: Page, amount: number): Promise<void> {
   const drawer = page.getByRole('dialog');
+  const type = drawer.getByRole('radio', { name: 'Type' });
+  if (await type.count()) await type.click();
   await drawer.getByRole('button', { name: 'Clear', exact: true }).click();
   for (const d of String(amount)) await drawer.getByRole('button', { name: d, exact: true }).click();
 }
