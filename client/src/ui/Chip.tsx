@@ -1,4 +1,4 @@
-import { COLORS, type ChipColor, markOn, towerOf, type TowerShape } from './towers.js';
+import { COLORS, type ChipColor, chipSize, markOn, STACK_JITTER, towerOf, type TowerShape } from './towers.js';
 
 const INK = COLORS.ink;
 
@@ -7,49 +7,47 @@ function shade(hex: string, f: number): string {
   return `rgb(${Math.round((n >> 16) * f)},${Math.round(((n >> 8) & 255) * f)},${Math.round((n & 255) * f)})`;
 }
 
-const JITTER = [0, 2, -1, 3, -2, 1, 0, -3, 2, -1, 1, -2];
+/** One cartoon chip seen from the side, ink-outlined, centered on its edge band. */
+export function ChipSide({ color, width }: { color: ChipColor; width: number }) {
+  const { w, th, ry } = chipSize(width);
+  const col = COLORS[color];
+  const mark = markOn(color);
+  const x0 = -w / 2;
+  const y0 = -th / 2;
+  return (
+    <>
+      <path
+        d={`M${x0} ${y0} v${th} A${w / 2} ${ry} 0 0 0 ${x0 + w} ${y0 + th} v${-th} z`}
+        fill={shade(col, 0.82)}
+        stroke={INK}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      {[0.2, 0.5, 0.8].map((fx) => {
+        const x = fx * w;
+        const e = ry * Math.sqrt(1 - ((x - w / 2) / (w / 2)) ** 2);
+        return <rect key={fx} x={x0 + x - w * 0.05} y={y0 + e + 1} width={w * 0.1} height={th - 2} fill={mark} opacity=".9" />;
+      })}
+      <ellipse cx={0} cy={y0} rx={w / 2} ry={ry} fill={col} stroke={INK} strokeWidth="2.2" />
+      <ellipse cx={0} cy={y0} rx={w * 0.3} ry={ry * 0.58} fill="none" stroke={mark} strokeOpacity=".75" strokeWidth="2" strokeDasharray="4 4" />
+    </>
+  );
+}
 
 /** One cartoon side-view stack, ink-outlined; colors bottom to top. */
 export function Stack({ colors, width, wobble = true }: { colors: ChipColor[]; width: number; wobble?: boolean }) {
-  const w = width;
-  const th = w * 0.2;
-  const ry = w * 0.26;
+  const { w, th, ry } = chipSize(width);
   const pad = 3;
   const H = Math.ceil(colors.length * th + ry * 2 + pad * 2);
   const W = w + pad * 2 + 8;
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
       {colors.map((c, i) => {
-        const col = COLORS[c];
-        const dx = pad + 4 + (wobble ? JITTER[i % JITTER.length] : 0);
+        const dx = pad + 4 + (wobble ? STACK_JITTER[i % STACK_JITTER.length] : 0);
         const yc = H - pad - ry - (i + 1) * th;
-        const mark = markOn(c);
         return (
-          <g key={i}>
-            <path
-              d={`M${dx} ${yc} v${th} A${w / 2} ${ry} 0 0 0 ${dx + w} ${yc + th} v${-th} z`}
-              fill={shade(col, 0.82)}
-              stroke={INK}
-              strokeWidth="2.2"
-              strokeLinejoin="round"
-            />
-            {[0.2, 0.5, 0.8].map((fx) => {
-              const x = fx * w;
-              const e = ry * Math.sqrt(1 - ((x - w / 2) / (w / 2)) ** 2);
-              return <rect key={fx} x={dx + x - w * 0.05} y={yc + e + 1} width={w * 0.1} height={th - 2} fill={mark} opacity=".9" />;
-            })}
-            <ellipse cx={dx + w / 2} cy={yc} rx={w / 2} ry={ry} fill={col} stroke={INK} strokeWidth="2.2" />
-            <ellipse
-              cx={dx + w / 2}
-              cy={yc}
-              rx={w * 0.3}
-              ry={ry * 0.58}
-              fill="none"
-              stroke={mark}
-              strokeOpacity=".75"
-              strokeWidth="2"
-              strokeDasharray="4 4"
-            />
+          <g key={i} transform={`translate(${dx + w / 2} ${yc + th / 2})`}>
+            <ChipSide color={c} width={w} />
           </g>
         );
       })}

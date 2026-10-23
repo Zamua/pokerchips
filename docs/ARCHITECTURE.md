@@ -27,7 +27,7 @@ only point downward.
 | Protocol | `protocol/` | Frame and state types shared by the Worker and the client, and the parser that turns untrusted JSON into typed frames. | `domain/` |
 | Application | `app/` | `TableService`: load the table, run a domain command, persist the entry, publish the new state. Ports it needs: `TableStore`, `Publisher`, `Clock`, `Random`. | `domain/`, `protocol/` |
 | Adapters | `worker/` | The Worker entry, `TableCell`, the SQLite `TableStore`, the hibernating-socket `Publisher`, rate limiting, the expiry alarm. | everything above |
-| Client | `client/` | The React app: screens, the drawer, the socket lifecycle, recent tables. | `protocol/`, `domain/` (for formatting and client-side checks only) |
+| Client | `client/` | The React app: screens, the drawer, the socket lifecycle, recent tables, the landing's chip toy. | `protocol/`, `domain/` (for formatting and client-side checks only) |
 
 The domain decides; it never does I/O, reads the clock or makes randomness.
 Time and ids come in as arguments. A command returns either the entries to
@@ -35,6 +35,11 @@ append or an error code, so every rule is a plain unit test.
 
 Cross-cutting concerns stay out of the domain and the service: origin
 checks, rate limits and logging wrap them at the Worker and the cell.
+
+The landing's chip toy follows the same split inside the client: `ui/toy.ts`
+holds its rules (where chips rest, what a tap does, where a dropped chip
+settles), `ui/toyWorld.ts` adapts them to matter-js and is loaded on demand
+in its own chunk, and `ui/ChipToy.tsx` draws the chips and handles pointers.
 
 ## The table actor
 
@@ -68,9 +73,9 @@ in a table that does not exist yet.
 - `app/` and `worker/`: integration tests against a real Durable Object and
   real WebSockets under `@cloudflare/vitest-plugin`: two clients, races
   on one pot, repeated `op` ids, reconnects, expiry.
-- `client/`: unit tests for the socket lifecycle and the state reducer, and
-  a Playwright suite that drives two players through a hand on phone-sized
-  Chromium and WebKit.
+- `client/`: unit tests for the socket lifecycle, the state reducer and the
+  chip toy's rules, and a Playwright suite that drives two players through a
+  hand, and the chip toy, on phone-sized Chromium and WebKit.
 
 ## Deploy contract
 
