@@ -26,6 +26,14 @@ describe('the chip toy', () => {
     expect(kick(poses, 0, 110, size, 0.3).every((c) => c.vx < 0)).toBe(true);
   });
 
+  it('tips a column the other way when a taller stack stands where it would fall', () => {
+    const short = column(100, 3);
+    const tall = column(154, 6);
+    const k = kick([...short, ...tall], 0, 90, size, 0.3);
+    expect(k.map((c) => c.index)).toEqual([0, 1, 2]);
+    for (const c of k) expect(c.vx).toBeLessThan(0);
+  });
+
   it('flips a lone chip up off the ground', () => {
     const k = kick([flat(100, 290), flat(300, 290)], 0, 100, size, 0.9);
     expect(k).toHaveLength(1);

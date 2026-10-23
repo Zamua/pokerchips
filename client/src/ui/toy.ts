@@ -61,21 +61,30 @@ function above(poses: readonly Pose[], below: Pose, taken: readonly number[], si
 }
 
 /**
- * What a tap does: a chip with chips on it tips its column over, away from
- * the side that was tapped, the higher chips faster; a chip alone hops and
- * flips. `rand` in [0, 1) picks a side for a tap dead center.
+ * What a tap does: a chip with chips on it tips its column over like a
+ * domino, pivoting on its bottom edge, away from the side that was tapped
+ * unless a stack as tall stands there; a chip alone hops and flips. `rand` in
+ * [0, 1) picks a side for a tap dead center.
  */
 export function kick(poses: readonly Pose[], index: number, tapX: number, size: ChipSize, rand: number): Kick[] {
   const tapped = poses[index];
   const column = [index];
   for (let next = above(poses, tapped, column, size); next >= 0; next = above(poses, poses[next], column, size)) column.push(next);
+  const top = poses[column[column.length - 1]];
+  const walled = (d: number) =>
+    poses.some((p, i) => {
+      const dx = (p.x - tapped.x) * d;
+      return !column.includes(i) && dx > size.w * 0.4 && dx < size.w * 1.3 && p.y <= top.y + size.th * 0.5;
+    });
   const off = tapX - tapped.x;
-  const dir = Math.abs(off) < size.w * 0.08 ? (rand < 0.5 ? -1 : 1) : off < 0 ? 1 : -1;
+  let dir = Math.abs(off) < size.w * 0.08 ? (rand < 0.5 ? -1 : 1) : off < 0 ? 1 : -1;
+  if (walled(dir) && !walled(-dir)) dir = -dir;
   if (column.length === 1) return [{ index, vx: dir * 1.5, vy: -(5 + rand * 2), spin: dir * 0.25 }];
-  return column.map((i) => {
-    const h = tapped.y - poses[i].y;
-    return { index: i, vx: dir * (1.2 + h * 0.045), vy: -0.4 - h * 0.005, spin: dir * 0.02 };
-  });
+  // A squat column needs more turn to get its weight over the pivot.
+  const spin = dir * (0.05 + 2.2 / (tapped.y - top.y + size.th + 10));
+  const px = tapped.x + (dir * size.w) / 2;
+  const py = tapped.y + size.th / 2;
+  return column.map((i) => ({ index: i, vx: -spin * (poses[i].y - py), vy: spin * (poses[i].x - px), spin }));
 }
 
 /**
