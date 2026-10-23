@@ -14,7 +14,8 @@ async function drag(page: Page, from: Locator, to: { x: number; y: number }): Pr
 async function openBet(page: Page) {
   await page.getByRole('button', { name: 'Bet', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'Bet' });
-  return { drawer, readout: drawer.getByTestId('readout'), chip: (v: string) => drawer.getByRole('button', { name: `Put in a ${v} chip` }) };
+  await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  return { drawer, readout: drawer.getByTestId('readout'), chip: (v: string) => drawer.getByRole('button', { name: new RegExp(`^Put in a ${v} chip`) }) };
 }
 
 test('a bet made with chips: tapped, dragged in, undone, then confirmed', async ({ page }) => {
@@ -41,14 +42,21 @@ test('a bet made with chips: tapped, dragged in, undone, then confirmed', async 
   await expect(myStack(page)).toHaveText('300');
 });
 
-test('the tray only holds chips the stack still covers', async ({ page }) => {
+test('the tray is the stack in chips, and a used-up value gets change from a larger chip', async ({ page }) => {
   await openTable(page, 'Maya');
-  const { readout, chip } = await openBet(page);
-  await chip('500').click();
-  await expect(chip('500')).toBeEnabled();
-  await chip('500').click();
-  await expect(readout).toHaveText('1,000');
-  for (const v of ['5', '25', '100', '500']) await expect(chip(v)).toBeDisabled();
+  const { drawer, readout, chip } = await openBet(page);
+  const left = (v: string, n: number) => expect(drawer.getByRole('button', { name: `Put in a ${v} chip, ${n} left` })).toBeVisible();
+  await left('5', 10);
+  await left('25', 6);
+  await left('100', 3);
+  await left('500', 1);
+  for (let i = 0; i < 3; i++) await chip('100').click();
+  await expect(readout).toHaveText('300');
+  await left('100', 5);
+  await expect(chip('500')).toBeDisabled();
+  for (let i = 0; i < 5; i++) await chip('100').click();
+  await expect(readout).toHaveText('800');
+  await expect(chip('100')).toBeDisabled();
 });
 
 test('a typed bet puts its chips in, Reset takes them back, and typing is remembered', async ({ page }) => {
@@ -69,8 +77,28 @@ test('a typed bet puts its chips in, Reset takes them back, and typing is rememb
 
 test('All-in puts the whole stack in', async ({ page }) => {
   await openTable(page, 'Maya');
-  const { drawer, readout } = await openBet(page);
+  const { drawer, readout, chip } = await openBet(page);
   await drawer.getByRole('button', { name: 'All-in' }).click();
   await expect(readout).toHaveText('1,000');
   await expect(drawer.getByRole('button', { name: 'Bet 1,000 into main pot' })).toBeEnabled();
+  for (const v of ['5', '25', '100', '500']) await expect(chip(v)).toBeDisabled();
+});
+
+test('a drawer closes with a swipe down from anywhere in it', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'touch moves are sent over the Chrome DevTools Protocol');
+  await openTable(page, 'Maya');
+  const { drawer } = await openBet(page);
+  const cdp = await page.context().newCDPSession(page);
+  const swipe = async (from: { x: number; y: number }, by: number) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
+    for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x, y: from.y + (by * i) / 8 }] });
+    await page.waitForTimeout(250);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const felt = center((await drawer.locator('.felt').boundingBox())!);
+  await swipe(felt, 40);
+  await page.waitForTimeout(300);
+  await expect(drawer).toBeVisible();
+  await swipe(felt, 320);
+  await expect(drawer).toBeHidden();
 });

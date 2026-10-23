@@ -1,5 +1,5 @@
 import { BackspaceIcon, CheckCircleIcon, XIcon } from '@phosphor-icons/react';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { ChipTop } from './Chip.js';
 import { type Key, press } from './amount.js';
 import { chips, potName } from './text.js';
@@ -21,6 +21,9 @@ export function Drawer({
   footer?: ReactNode;
   label: string;
 }) {
+  const sheet = useRef<HTMLElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -29,10 +32,16 @@ export function Drawer({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const closing = useRef(onClose);
+  useEffect(() => {
+    closing.current = onClose;
+  }, [onClose]);
+  useEffect(() => swipeToClose(sheet.current!, body.current!, () => closing.current()), []);
+
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <section className="drawer" role="dialog" aria-modal="true" aria-label={label}>
+      <section className="drawer" ref={sheet} role="dialog" aria-modal="true" aria-label={label}>
         <div className="wrap">
           <div className="grab" />
           <div className="dh">
@@ -44,12 +53,82 @@ export function Drawer({
               <XIcon size={18} weight="bold" />
             </button>
           </div>
-          <div className="body">{children}</div>
+          <div className="body" ref={body}>
+            {children}
+          </div>
           {footer}
         </div>
       </section>
     </>
   );
+}
+
+/** How far down, as a share of the sheet's height, or how fast, in px per ms, a pull must go to close. */
+const PULL_SHARE = 0.25;
+const PULL_SPEED = 0.6;
+
+/**
+ * Lets a downward swipe anywhere on a sheet pull it closed, once its content
+ * is scrolled to the top. Touches that start on a `[data-drag]` element are
+ * theirs. Returns the cleanup.
+ */
+function swipeToClose(sheet: HTMLElement, body: HTMLElement, onClose: () => void): () => void {
+  let from: { x: number; y: number } | null = null;
+  let pulling = false;
+  let last = { y: 0, t: 0 };
+  let speed = 0;
+
+  const begin = (e: TouchEvent) => {
+    const t = e.touches[0];
+    from = e.touches.length === 1 && !(e.target as Element).closest('[data-drag]') ? { x: t.clientX, y: t.clientY } : null;
+    pulling = false;
+  };
+  const move = (e: TouchEvent) => {
+    if (!from) return;
+    const t = e.touches[0];
+    const dx = t.clientX - from.x;
+    const dy = t.clientY - from.y;
+    if (!pulling) {
+      if (Math.hypot(dx, dy) < 8) return;
+      if (dy <= Math.abs(dx) || body.scrollTop > 0) {
+        from = null;
+        return;
+      }
+      pulling = true;
+      from = { x: t.clientX, y: t.clientY };
+      last = { y: t.clientY, t: e.timeStamp };
+      sheet.style.transition = 'none';
+    }
+    e.preventDefault();
+    speed = (t.clientY - last.y) / Math.max(1, e.timeStamp - last.t);
+    last = { y: t.clientY, t: e.timeStamp };
+    sheet.style.transform = `translateY(${Math.max(0, t.clientY - from.y)}px)`;
+  };
+  const end = () => {
+    if (!from || !pulling) return;
+    const pulled = last.y - from.y;
+    from = null;
+    pulling = false;
+    if (pulled > sheet.offsetHeight * PULL_SHARE || speed > PULL_SPEED) {
+      sheet.style.transition = 'transform 160ms ease-in';
+      sheet.style.transform = 'translateY(100%)';
+      setTimeout(onClose, 150);
+    } else {
+      sheet.style.transition = 'transform 180ms ease-out';
+      sheet.style.transform = '';
+    }
+  };
+
+  sheet.addEventListener('touchstart', begin, { passive: true });
+  sheet.addEventListener('touchmove', move, { passive: false });
+  sheet.addEventListener('touchend', end);
+  sheet.addEventListener('touchcancel', end);
+  return () => {
+    sheet.removeEventListener('touchstart', begin);
+    sheet.removeEventListener('touchmove', move);
+    sheet.removeEventListener('touchend', end);
+    sheet.removeEventListener('touchcancel', end);
+  };
 }
 
 /** Choose a pot; each shows its amount. */

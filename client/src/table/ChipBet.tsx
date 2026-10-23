@@ -8,7 +8,7 @@ import { reducedMotion } from '../ui/motion.js';
 import { playChips } from '../ui/sound.js';
 import { chips, DENOMINATIONS } from '../ui/text.js';
 import { chipColor, chipSize } from '../ui/towers.js';
-import { type Bet, type BetAction, tray } from './betChips.js';
+import { type Bet, type BetAction, FELT_CAP, stacksOf } from './betChips.js';
 import { FeltScene, type Origin, type Point } from './feltScene.js';
 
 /** The drawn width of a chip on the felt and in the tray. */
@@ -17,6 +17,8 @@ const W = 44;
 const SLOP = 8;
 /** A chip let go below the felt still goes in when flicked up faster than this, in pixels per frame. */
 const FLICK = 4;
+/** The most chips a tray stack draws; its count says how many it holds. */
+const TALL = 10;
 
 interface Grip {
   id: number;
@@ -27,8 +29,6 @@ interface Grip {
 }
 
 interface Props {
-  /** The tray's chip values, smallest first. */
-  values: number[];
   stack: number;
   pot: string;
   bet: Bet;
@@ -41,7 +41,7 @@ interface Props {
  * A bet made with chips: the felt shows the chips in and their total, the
  * tray holds the chips to put in, and the keypad stands in for the tray.
  */
-export function ChipBet({ values, stack, pot, bet: b, dispatch, mode, onMode }: Props) {
+export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const felt = useRef<HTMLDivElement>(null);
   const layer = useRef<SVGGElement>(null);
@@ -52,7 +52,6 @@ export function ChipBet({ values, stack, pot, bet: b, dispatch, mode, onMode }: 
   const dragged = useRef(false);
   const [held, setHeld] = useState<number | null>(null);
   const size = chipSize(W);
-  const counts = tray(values, stack - b.amount);
   const over = b.amount > stack;
   const text = chips(b.amount);
 
@@ -111,7 +110,7 @@ export function ChipBet({ values, stack, pot, bet: b, dispatch, mode, onMode }: 
       if (o) take.set(c.id, o);
     }
     queued.clear();
-    scene.current?.sync(b.thrown, take);
+    scene.current?.sync(b.thrown.slice(0, FELT_CAP), take);
   }, [b.thrown]);
 
   const put = (value: number, from?: Origin) => {
@@ -211,14 +210,16 @@ export function ChipBet({ values, stack, pot, bet: b, dispatch, mode, onMode }: 
       </div>
       {mode === 'chips' ? (
         <div className="tray">
-          {values.map((v, i) => {
-            const n = counts[i] - (held === v ? 1 : 0);
+          {stacksOf(b).map((v) => {
+            const count = b.tray[v] ?? 0;
+            const n = count - (held === v ? 1 : 0);
             return (
               <button
                 key={v}
                 className="tray-stack"
-                disabled={counts[i] === 0}
-                aria-label={`Put in a ${chips(v)} chip`}
+                data-drag
+                disabled={count === 0}
+                aria-label={`Put in a ${chips(v)} chip, ${count} left`}
                 onPointerDown={down(v)}
                 onPointerMove={move}
                 onPointerUp={up}
@@ -232,7 +233,8 @@ export function ChipBet({ values, stack, pot, bet: b, dispatch, mode, onMode }: 
                     else stacks.current.delete(v);
                   }}
                 >
-                  {n > 0 ? <Stack colors={Array(n).fill(chipColor(v))} width={W} /> : <span className="tray-empty" />}
+                  {n > 0 ? <Stack colors={Array(Math.min(n, TALL)).fill(chipColor(v))} width={W} /> : <span className="tray-empty" />}
+                  {n > 0 && <span className="tray-count">×{n}</span>}
                 </span>
                 <span className="tray-tag">{compact(v)}</span>
               </button>

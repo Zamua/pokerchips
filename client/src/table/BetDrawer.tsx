@@ -1,11 +1,11 @@
 import { PokerChipIcon } from '@phosphor-icons/react';
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import type { SeatView, TableView } from '../../../protocol/frames.js';
 import { type BetMode, profile } from '../store/profile.js';
 import { Drawer, PotPicker, confirmClass } from '../ui/Drawer.js';
 import { chips, potName, quickChips } from '../ui/text.js';
 import { ChipBet } from './ChipBet.js';
-import { bet, emptyBet } from './betChips.js';
+import { bet, startBet } from './betChips.js';
 
 export function BetDrawer({
   state,
@@ -21,7 +21,8 @@ export function BetDrawer({
   onBet(pot: string, amount: number): void;
 }) {
   const [chosen, setPot] = useState(initialPot);
-  const [b, dispatch] = useReducer(bet, emptyBet);
+  const [b, dispatch] = useReducer(bet, null, () => startBet(me.stack, quickChips(state.buyIn)));
+  useEffect(() => dispatch({ t: 'restart', stack: me.stack }), [me.stack]);
   const [mode, setMode] = useState<BetMode>(profile.betMode);
   const pot = state.pots.some((p) => p.id === chosen) ? chosen : 'main';
   const over = b.amount > me.stack;
@@ -41,7 +42,6 @@ export function BetDrawer({
     >
       <PotPicker pots={state.pots} value={pot} onChange={setPot} />
       <ChipBet
-        values={quickChips(state.buyIn)}
         stack={me.stack}
         pot={potName(pot)}
         bet={b}
