@@ -2060,6 +2060,7 @@ input {
 }
 
 .tray-chips {
+  position: relative;
   display: block;
 }
 
@@ -2093,4 +2094,18 @@ input {
   overflow: visible;
   pointer-events: none;
   z-index: 2;
+}
+
+.tray-count {
+  position: absolute;
+  right: -6px;
+  top: -8px;
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--sun);
 }
