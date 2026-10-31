@@ -182,7 +182,7 @@ export function ChipBet({ stack, pot, bet: b, dispatch, mode, onMode }: Props) {
 
   return (
     <div className="cb" ref={box}>
-      <div className="felt" ref={felt}>
+      <div className="felt" ref={felt} data-testid="felt">
         <div className="tot">
           <div className={`n ${lengthClass(text, 6, 9)}${b.amount === 0 ? ' zero' : ''}`} data-testid="readout">
             {text}

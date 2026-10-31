@@ -245,7 +245,7 @@ export function ChipToy({ stacks, width, onMessy, ref }: Props) {
   }, [stacks, width, onMessy]);
 
   return (
-    <div className="toy" ref={box} aria-hidden="true">
+    <div className="toy" ref={box} aria-hidden="true" data-testid="toy">
         <svg>
           <defs>
             {colors.map((c) => (

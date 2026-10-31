@@ -16,6 +16,7 @@ export function flyChip(from: Element | null, to: Element | null, color: ChipCol
   if (!a.width || !b.width) return;
   const el = document.createElement('div');
   el.className = 'flying-chip';
+  el.dataset.testid = 'flying-chip';
   el.innerHTML = chipSvg(color);
   document.body.appendChild(el);
   const x0 = a.left + a.width / 2 - 15;

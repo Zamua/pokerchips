@@ -10,7 +10,7 @@ const spot = async (page: Page, id: string) => {
 
 test('the landing chips topple on a tap and restack', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.toy[data-toy="ready"]')).toBeAttached();
+  await expect(page.getByTestId('toy')).toHaveAttribute('data-toy', 'ready');
   const restack = page.getByRole('button', { name: 'Restack the chips' });
   await expect(restack).toHaveCount(0);
   const top = await chip(page, '2.9').getAttribute('transform');
@@ -27,7 +27,7 @@ test('the landing chips topple on a tap and restack', async ({ page }) => {
 
 test('a landing chip dropped over a stack settles on top of it', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.toy[data-toy="ready"]')).toBeAttached();
+  await expect(page.getByTestId('toy')).toHaveAttribute('data-toy', 'ready');
   const from = (await chip(page, '4.2').boundingBox())!;
   const onto = (await chip(page, '0.3').boundingBox())!;
   const target = await spot(page, '0.3');
@@ -71,5 +71,5 @@ test('the landing chips stay still under reduced motion', async ({ page }) => {
   await page.waitForTimeout(500);
   expect(await chip(page, '2.9').getAttribute('transform')).toBe(top);
   await expect(page.getByRole('button', { name: 'Restack the chips' })).toHaveCount(0);
-  await expect(page.locator('.toy')).not.toHaveAttribute('data-toy', 'ready');
+  await expect(page.getByTestId('toy')).not.toHaveAttribute('data-toy', 'ready');
 });

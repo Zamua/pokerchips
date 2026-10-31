@@ -288,7 +288,7 @@ export function Table({ code, seatKey, onLost }: { code: string; seatKey: string
 function Connection({ status, onRetry }: { status: Status; onRetry(): void }) {
   if (status === 'offline' || status === 'denied') {
     return (
-      <button className="live off" onClick={onRetry} aria-label="Offline. Retry">
+      <button className="live off" onClick={onRetry} aria-label="Offline. Retry" data-testid="connection">
         <span className="dot" />
         Offline
         <ArrowsClockwiseIcon size={16} weight="bold" />
@@ -297,7 +297,7 @@ function Connection({ status, onRetry }: { status: Status; onRetry(): void }) {
   }
   const label = status === 'online' ? 'Live' : status === 'connecting' ? 'Connecting' : 'Reconnecting';
   return (
-    <div className={`live${status === 'online' ? '' : ' wait'}`} role="status" aria-live="polite">
+    <div className={`live${status === 'online' ? '' : ' wait'}`} role="status" aria-live="polite" data-testid="connection">
       <span className="dot" />
       {label}
     </div>
@@ -347,7 +347,7 @@ function Pots({ state }: { state: TableView }) {
 function SeatCard({ seat, state, me, onOpen }: { seat: SeatView; state: TableView; me: string; onOpen(): void }) {
   const text = chips(seat.stack);
   return (
-    <button className={`pc${isHere(seat) ? '' : ' away'}`} data-seat={seat.id} onClick={onOpen} aria-label={`${seat.name}, ${text} chips`}>
+    <button className={`pc${isHere(seat) ? '' : ' away'}`} data-seat={seat.id} onClick={onOpen} aria-label={`${seat.name}${isHere(seat) ? '' : ', away'}, ${text} chips`}>
       <div className="r1">
         <ChipTop color={isHere(seat) ? seatColor(seat.id, state.seats) : 'mist'} label={initial(seat.name)} size={34} />
         <span className="bdg">
