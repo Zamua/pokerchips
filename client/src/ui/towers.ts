@@ -22,8 +22,10 @@ export interface ChipSize {
 
 export const chipSize = (w: number): ChipSize => ({ w, th: w * 0.2, ry: w * 0.26 });
 
-/** How far each chip of a drawn stack sits off the stack's line, by level. */
-export const STACK_JITTER = [0, 2, -1, 3, -2, 1, 0, -3, 2, -1, 1, -2];
+const JITTER = [0, 2, -1, 3, -2, 1, 0, -3, 2, -1, 1, -2];
+
+/** How far the chip at `level` of a drawn stack sits off the stack's line; the bottom chip sits on it. */
+export const stackJitter = (level: number) => JITTER[level % JITTER.length];
 
 const LIGHT: ReadonlySet<ChipColor> = new Set(['paper', 'sun', 'sky', 'mist', 'pink']);
 
