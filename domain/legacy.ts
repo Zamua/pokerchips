@@ -1,7 +1,7 @@
 import type { ErrorCode } from './errors.js';
 import type { Entry } from './ledger.js';
 import type { Seat, Table } from './table.js';
-import { MAIN_POT, isChips, parseTableCode } from './values.js';
+import { MAIN_POT, NAME_MAX, dropNameChars, isChips, parseTableCode, sidePotNumber } from './values.js';
 
 /** A room as version 2 persisted it. Every field is untrusted. */
 export interface LegacyRoom {
@@ -19,8 +19,6 @@ export interface LegacyRoom {
 
 export type Imported = { ok: true; table: Table; entries: Entry[] } | { ok: false; code: ErrorCode; detail: string };
 
-const NAME_CHARS = /[^a-zA-Z0-9 \-_'.]/g;
-const SIDE = /^side-([1-9][0-9]*)$/;
 const time = (v: unknown, fallback: number) => (Number.isSafeInteger(v) && (v as number) > 0 ? (v as number) : fallback);
 
 /** A seat id from a version 2 player id (a UUID): its first 16 hex digits. */
@@ -28,9 +26,9 @@ export function seatIdOf(legacyId: string): string {
   return legacyId.replaceAll('-', '').toLowerCase().slice(0, 16);
 }
 
-/** A version 2 name made valid: spaces collapsed, other characters dropped, at most 20. */
+/** A version 2 name made valid: spaces collapsed, other characters dropped, cut to length. */
 export function cleanName(raw: unknown, n: number): string {
-  const name = (typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').replace(NAME_CHARS, '').trim().slice(0, 20).trim();
+  const name = dropNameChars((typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ')).trim().slice(0, NAME_MAX).trim();
   return name || `Player ${n}`;
 }
 
@@ -38,7 +36,7 @@ function unique(name: string, taken: Set<string>): string {
   let candidate = name;
   for (let i = 2; taken.has(candidate.toLowerCase()); i++) {
     const suffix = ` ${i}`;
-    candidate = name.slice(0, 20 - suffix.length).trimEnd() + suffix;
+    candidate = name.slice(0, NAME_MAX - suffix.length).trimEnd() + suffix;
   }
   taken.add(candidate.toLowerCase());
   return candidate;
@@ -76,9 +74,9 @@ export function importLegacy(room: LegacyRoom, now: number): Imported {
       pots[0].amount = p.amount;
       continue;
     }
-    const side = typeof p.id === 'string' ? SIDE.exec(p.id) : null;
-    if (!side || pots.some((x) => x.id === p.id)) return fail('no-such-pot', `pot ${String(p.id)}`);
-    highest = Math.max(highest, Number(side[1]));
+    const side = typeof p.id === 'string' ? sidePotNumber(p.id) : null;
+    if (side === null || pots.some((x) => x.id === p.id)) return fail('no-such-pot', `pot ${String(p.id)}`);
+    highest = Math.max(highest, side);
     pots.push({ id: p.id as string, amount: p.amount });
   }
   const counter = Number.isSafeInteger(room.sidePotCounter) ? (room.sidePotCounter as number) : 0;

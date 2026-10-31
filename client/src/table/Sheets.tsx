@@ -18,7 +18,8 @@ import {
 import { useRef, useState } from 'react';
 import type { Entry } from '../../../domain/ledger.js';
 import type { Command } from '../../../domain/table.js';
-import { HOST_CLAIM_AFTER_MS, LEDGER_TAIL, MAX_SIDE_POTS } from '../../../domain/values.js';
+import { hostClaimable } from '../../../domain/table.js';
+import { LEDGER_TAIL, MAIN_POT, MAX_SIDE_POTS } from '../../../domain/values.js';
 import type { SeatView, TableView } from '../../../protocol/frames.js';
 import { ChipTop } from '../ui/Chip.js';
 import { Drawer } from '../ui/Drawer.js';
@@ -141,8 +142,7 @@ export function PlayersSheet({
 }) {
   const isHost = state.host === me;
   const host = state.seats.find((s) => s.id === state.host);
-  const claimable =
-    !isHost && (!host || (host.awaySince !== null && now - host.awaySince >= HOST_CLAIM_AFTER_MS));
+  const claimable = !isHost && hostClaimable(state, now);
 
   return (
     <Drawer title="Players" sub={`${state.seats.length} at the table`} label="Players" onClose={onClose}>
@@ -216,7 +216,7 @@ export function PotsSheet({ state, me, onClose, run }: { state: TableView; me: s
           <div className="potrow" key={p.id} data-pot-row={p.id}>
             <span className="pn">{capital(potName(p.id))}</span>
             <span className="pv">{chips(p.amount)}</span>
-            {isHost && p.id !== 'main' && (
+            {isHost && p.id !== MAIN_POT && (
               <button
                 className="mini"
                 aria-label={`Close ${potName(p.id)}`}

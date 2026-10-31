@@ -13,10 +13,15 @@ export const HOST_CLAIM_AFTER_MS = 10 * 60_000;
 export const IDLE_LIFETIME_MS = 30 * 24 * 60 * 60_000;
 export const LEDGER_TAIL = 50;
 export const MAIN_POT: PotId = 'main';
+export const CODE_LENGTH = 8;
+export const NAME_MAX = 20;
 
-const CODE = /^[a-z0-9]{8}$/;
-const NAME = /^[a-zA-Z0-9 \-_'.]{1,20}$/;
-const SIDE_POT = /^side-[1-9][0-9]*$/;
+const CODE = new RegExp(`^[a-z0-9]{${CODE_LENGTH}}$`);
+/** The characters a seat name may hold, as the body of a regex class. */
+const NAME_CHARS = "a-zA-Z0-9 \\-_'.";
+const NAME = new RegExp(`^[${NAME_CHARS}]{1,${NAME_MAX}}$`);
+const NOT_NAME_CHAR = new RegExp(`[^${NAME_CHARS}]`, 'g');
+const SIDE_POT = /^side-([1-9][0-9]*)$/;
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; code: ErrorCode };
 
@@ -63,3 +68,14 @@ export function parseBuyIn(input: unknown): Parsed<Chips> {
 export function isPotId(input: unknown): input is PotId {
   return typeof input === 'string' && (input === MAIN_POT || SIDE_POT.test(input));
 }
+
+export const sidePotId = (n: number): PotId => `side-${n}`;
+
+/** The number of a side pot, or null for the main pot or anything that is not a pot id. */
+export function sidePotNumber(id: string): number | null {
+  const m = SIDE_POT.exec(id);
+  return m ? Number(m[1]) : null;
+}
+
+/** The name with every character a seat name may not hold removed. */
+export const dropNameChars = (name: string) => name.replace(NOT_NAME_CHAR, '');

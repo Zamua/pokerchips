@@ -6,6 +6,9 @@ import { IDLE_LIFETIME_MS, LEDGER_TAIL, type SeatId, type TableCode } from '../d
 import { type TableView, viewOf } from '../protocol/frames.js';
 import type { Answer, Clock, Publisher, Secrets, TableStore } from './ports.js';
 
+/** An expiry check that finds the table still in use waits this long before the next. */
+const RECHECK_MS = 60 * 60_000;
+
 export type Seated = { ok: true; seatId: SeatId; seatKey: string } | { ok: false; code: ErrorCode | 'exists' };
 
 /**
@@ -101,6 +104,12 @@ export class TableService {
   expiresAt(): number | null {
     const table = this.store.load();
     return table && table.lastActivity + IDLE_LIFETIME_MS;
+  }
+
+  /** When to next check for expiry: at expiry, but never sooner than RECHECK_MS from now. */
+  nextCheck(): number | null {
+    const at = this.expiresAt();
+    return at === null ? null : Math.max(at, this.clock.now() + RECHECK_MS);
   }
 
   /** Deletes the table if it has been idle long enough and nobody is connected. */

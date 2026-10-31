@@ -1,6 +1,7 @@
 import { describe as group, expect, it } from 'vitest';
 import type { Entry } from '../../../domain/ledger.js';
-import { ago, describe, emphasize, initial, quickChips, showCode, when } from './text.js';
+import { CODE_LENGTH, MAX_SEATS, MAX_SIDE_POTS, NAME_MAX, sidePotId } from '../../../domain/values.js';
+import { ago, describe, emphasize, initial, potName, quickChips, sentence, showCode, when } from './text.js';
 
 const base = { seq: 1, at: 0, by: 'ben', byName: 'Ben' } as const;
 
@@ -68,4 +69,18 @@ it('marks the actor and the amounts in a ledger line', () => {
   ]);
   expect(emphasize('You won 50 from the side pot 2', 'Ana')[0]).toEqual({ text: 'You', kind: 'name' });
   expect(emphasize('Bennett joined', 'Ben')[0]).toEqual({ text: 'Bennett joined', kind: 'plain' });
+});
+
+group('limits and pots', () => {
+  it('states the limits the domain enforces', () => {
+    expect(sentence('bad-name')).toContain(`1 to ${NAME_MAX}`);
+    expect(sentence('bad-code')).toContain(`${CODE_LENGTH} letters`);
+    expect(sentence('table-full')).toContain(`${MAX_SEATS} seats`);
+    expect(sentence('too-many-pots')).toContain(`${MAX_SIDE_POTS} side pots`);
+  });
+
+  it('names pots by the domain\'s ids', () => {
+    expect(potName('main')).toBe('main pot');
+    expect(potName(sidePotId(3))).toBe('side pot 3');
+  });
 });

@@ -14,6 +14,7 @@ import {
   parseDelta,
   parseSeatName,
   sameName,
+  sidePotId,
 } from './values.js';
 
 export interface Seat {
@@ -117,6 +118,12 @@ export function join(table: Table, args: NewSeat): Outcome {
   return withSeat(record(seated, args.now, [buyInEntry(seated, seat.id, seat.name)]), seat.id);
 }
 
+/** The host's seat is gone, or has been away long enough for another player to take it over. */
+export function hostClaimable(t: Pick<Table, 'host'> & { seats: readonly Pick<Seat, 'id' | 'awaySince'>[] }, now: number): boolean {
+  const host = t.seats.find((s) => s.id === t.host);
+  return host === undefined || (host.awaySince !== null && now - host.awaySince >= HOST_CLAIM_AFTER_MS);
+}
+
 export function seatByKeyHash(table: Table, keyHash: string): Seat | undefined {
   return table.seats.find((s) => s.keyHash === keyHash);
 }
@@ -190,7 +197,7 @@ export function execute(table: Table, actor: SeatId, cmd: Command, now: number):
     case 'openPot': {
       if (!isHost) return refuse('not-host');
       if (table.pots.length - 1 >= MAX_SIDE_POTS) return refuse('too-many-pots');
-      const id = `side-${table.nextSidePot}`;
+      const id = sidePotId(table.nextSidePot);
       const opened = { ...table, pots: [...table.pots, { id, amount: 0 }], nextSidePot: table.nextSidePot + 1 };
       return commit(opened, now, [{ kind: 'openPot', pot: id, ...by }]);
     }
@@ -219,9 +226,7 @@ export function execute(table: Table, actor: SeatId, cmd: Command, now: number):
     }
     case 'claimHost': {
       if (isHost) return { ok: true, table, entries: [] };
-      const host = seatOf(table, table.host);
-      const away = host === undefined || (host.awaySince !== null && now - host.awaySince >= HOST_CLAIM_AFTER_MS);
-      if (!away) return refuse('host-here');
+      if (!hostClaimable(table, now)) return refuse('host-here');
       return commit({ ...table, host: actor }, now, [{ kind: 'handOver', to: actor, toName: me.name, ...by }]);
     }
     case 'remove': {

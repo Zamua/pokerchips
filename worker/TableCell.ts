@@ -1,10 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Publisher } from '../app/ports.js';
 import { TableService } from '../app/tableService.js';
-import type { ErrorCode } from '../domain/errors.js';
-import { IDLE_LIFETIME_MS } from '../domain/values.js';
 import { PING, PONG, type ServerFrame, opOf, parseClientFrame } from '../protocol/frames.js';
 import type { Env } from './env.js';
+import { CELL_ROUTES, STATUS, json } from './http.js';
 import { RateLimit } from './rateLimit.js';
 import { secrets } from './secrets.js';
 import { SqlTableStore } from './sqlStore.js';
@@ -12,15 +11,6 @@ import { SqlTableStore } from './sqlStore.js';
 interface Attachment {
   seat: string | null;
 }
-
-const STATUS: Partial<Record<ErrorCode | 'exists', number>> = {
-  'not-found': 404,
-  exists: 409,
-  'name-taken': 409,
-  'table-full': 409,
-};
-
-const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 /** The actor that owns one table: its storage, its sockets, its expiry. */
 export class TableCell extends DurableObject<Env> {
@@ -36,29 +26,29 @@ export class TableCell extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     const { pathname } = new URL(request.url);
-    if (pathname === '/socket') return this.accept(request);
-    if (pathname === '/info' && request.method === 'GET') {
+    if (pathname === CELL_ROUTES.socket) return this.accept(request);
+    if (pathname === CELL_ROUTES.info && request.method === 'GET') {
       const info = this.service.info();
       return info ? json(info) : json({ error: 'not-found' }, 404);
     }
     if (request.method !== 'POST') return json({ error: 'bad-frame' }, 405);
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return json({ error: 'bad-frame' }, 400);
-    if (pathname === '/open') {
+    if (pathname === CELL_ROUTES.open) {
       const seated = await this.service.open(String(body.code), body.name, body.buyIn);
       if (!seated.ok) return json({ error: seated.code }, STATUS[seated.code] ?? 400);
-      await this.ctx.storage.setAlarm(Date.now() + IDLE_LIFETIME_MS);
+      await this.arm();
       return json({ code: body.code, seatId: seated.seatId, seatKey: seated.seatKey }, 201);
     }
-    if (pathname === '/import') {
+    if (pathname === CELL_ROUTES.import) {
       const room = body.room as Record<string, unknown> | undefined;
       if (!room || (this.ctx.id.name !== undefined && room.id !== this.ctx.id.name)) return json({ error: 'bad-code' }, 400);
       const done = this.service.importLegacy(room);
       if (!done.ok) return json({ error: done.code, detail: done.detail }, STATUS[done.code] ?? 400);
-      await this.ctx.storage.setAlarm(Math.max(this.service.expiresAt() ?? 0, Date.now() + 60 * 60_000));
+      await this.arm();
       return json({ code: room.id, seats: done.seats }, 201);
     }
-    if (pathname === '/seats') {
+    if (pathname === CELL_ROUTES.seats) {
       const seated = await this.service.join(body.name);
       if (!seated.ok) return json({ error: seated.code }, STATUS[seated.code] ?? 400);
       return json({ seatId: seated.seatId, seatKey: seated.seatKey }, 201);
@@ -117,9 +107,12 @@ export class TableCell extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    if (this.service.expire(this.ctx.getWebSockets().length)) return;
-    const at = this.service.expiresAt();
-    if (at !== null) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 60 * 60_000));
+    if (!this.service.expire(this.ctx.getWebSockets().length)) await this.arm();
+  }
+
+  private async arm(): Promise<void> {
+    const at = this.service.nextCheck();
+    if (at !== null) await this.ctx.storage.setAlarm(at);
   }
 
   private accept(request: Request): Response {

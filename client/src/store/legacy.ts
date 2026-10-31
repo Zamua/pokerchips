@@ -1,4 +1,5 @@
 import { cleanName } from '../../../domain/legacy.js';
+import { parseTableCode } from '../../../domain/values.js';
 import type { RecentTable } from './recent.js';
 
 /**
@@ -15,8 +16,6 @@ export interface LegacyTable {
   openedAt: number;
 }
 
-const CODE = /^[a-z0-9]{8}$/;
-
 /** The stored version 2 list as tables to adopt; anything unreadable is skipped. */
 export function parseLegacy(raw: string | null): LegacyTable[] {
   let v: unknown;
@@ -28,8 +27,9 @@ export function parseLegacy(raw: string | null): LegacyTable[] {
   if (!Array.isArray(v)) return [];
   const out: LegacyTable[] = [];
   for (const r of v as Record<string, unknown>[]) {
-    const code = typeof r?.roomId === 'string' ? r.roomId.trim().toLowerCase() : '';
-    if (!CODE.test(code) || out.some((t) => t.code === code)) continue;
+    const parsed = parseTableCode(r?.roomId);
+    if (!parsed.ok || out.some((t) => t.code === parsed.value)) continue;
+    const code = parsed.value;
     const name = typeof r.playerName === 'string' && /[a-zA-Z0-9]/.test(r.playerName) ? cleanName(r.playerName, 0) : '';
     const openedAt = Number.isSafeInteger(r.lastVisited) && (r.lastVisited as number) > 0 ? (r.lastVisited as number) : 0;
     out.push({ code, name, openedAt });
