@@ -1,6 +1,6 @@
 import { CheckIcon, HandCoinsIcon, ScalesIcon } from '@phosphor-icons/react';
 import { useCallback, useState } from 'react';
-import type { SeatView, TableView } from '../../../protocol/frames.js';
+import { type SeatView, type TableView, isHere } from '../../../protocol/frames.js';
 import { ChipTop } from '../ui/Chip.js';
 import { type Key, splitPreview } from '../ui/amount.js';
 import { Drawer, Keypad, PotPicker, QuickChips, Readout, confirmClass, press } from '../ui/Drawer.js';
@@ -146,7 +146,7 @@ export function WinDrawer({
                   aria-pressed={on}
                   onClick={() => setPicked((p) => (on ? p.filter((x) => x !== s.id) : [...p, s.id]))}
                 >
-                  <ChipTop color={s.here ? seatColor(s.id, state.seats) : 'mist'} label={initial(s.name)} size={30} />
+                  <ChipTop color={isHere(s) ? seatColor(s.id, state.seats) : 'mist'} label={initial(s.name)} size={30} />
                   <span>{s.id === me.id ? `${s.name} (you)` : s.name}</span>
                   <span className="tick" aria-hidden="true" style={{ flex: 'none' }}>
                     {on && <CheckIcon size={14} weight="bold" />}

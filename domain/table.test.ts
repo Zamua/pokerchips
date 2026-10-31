@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { type Command, type Outcome, type Table, arrive, depart, execute, hostClaimable, join, openTable } from './table.js';
+import { type Command, type Outcome, type SeatOutcome, type Table, arrive, depart, execute, hostClaimable, join, openTable } from './table.js';
 import { HOST_CLAIM_AFTER_MS, MAX_SEATS, MAX_SIDE_POTS } from './values.js';
 
 const T0 = 1_000_000;
 
-function ok(outcome: Outcome): Extract<Outcome, { ok: true }> {
+function ok<O extends Outcome | SeatOutcome>(outcome: O): Extract<O, { ok: true }> {
   if (!outcome.ok) throw new Error(`refused: ${outcome.code}`);
-  return outcome;
+  return outcome as Extract<O, { ok: true }>;
 }
 
 /** Ana hosts with a 1,000 buy-in; Ben and Cara joined; all three are here. */

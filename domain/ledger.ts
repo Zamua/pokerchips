@@ -12,30 +12,40 @@ export interface Deltas {
 interface Base {
   seq: number;
   at: number;
-  /** The seat that acted; null for the table's own entries. */
-  by: SeatId | null;
-  /** The actor's name when it acted, so the entry still reads after a removal. */
-  byName: string | null;
+}
+
+/** The seat that acted, and its name then, so the entry still reads after a removal. */
+interface Acted {
+  by: SeatId;
+  byName: string;
 }
 
 export type Entry = Base &
   (
-    | { kind: 'bet'; pot: PotId; amount: Chips }
-    | { kind: 'collect'; pot: PotId; amount: Chips }
-    | { kind: 'split'; pot: PotId; shares: { seat: SeatId; name: string; amount: Chips }[] }
-    | { kind: 'adjust'; seat: SeatId; name: string; delta: number; reason: AdjustReason }
-    | { kind: 'clear'; pots: { pot: PotId; amount: Chips }[] }
-    | { kind: 'undo'; of: number; deltas: Deltas }
-    | { kind: 'openPot'; pot: PotId }
-    | { kind: 'closePot'; pot: PotId; moved: Chips }
-    | { kind: 'handOver'; to: SeatId; toName: string }
-    | { kind: 'note'; note: NoteKind; seat: SeatId | null; name: string; text?: string }
+    | (Acted &
+        (
+          | { kind: 'bet'; pot: PotId; amount: Chips }
+          | { kind: 'collect'; pot: PotId; amount: Chips }
+          | { kind: 'split'; pot: PotId; shares: { seat: SeatId; name: string; amount: Chips }[] }
+          | { kind: 'adjust'; seat: SeatId; name: string; delta: number; reason: AdjustReason }
+          | { kind: 'clear'; pots: { pot: PotId; amount: Chips }[] }
+          | { kind: 'undo'; of: number; deltas: Deltas }
+          | { kind: 'openPot'; pot: PotId }
+          | { kind: 'closePot'; pot: PotId; moved: Chips }
+          | { kind: 'handOver'; to: SeatId; toName: string }
+        ))
+    /** A note from the table itself, such as an import, has no actor. */
+    | ({ kind: 'note'; note: NoteKind; seat: SeatId | null; name: string; text?: string } & (Acted | { by: null; byName: null }))
   );
 
 export type EntryKind = Entry['kind'];
 
+const UNDOABLE_KINDS = ['bet', 'collect', 'split', 'adjust', 'clear'] as const satisfies readonly EntryKind[];
+type UndoableKind = (typeof UNDOABLE_KINDS)[number];
+const UNDOABLE: ReadonlySet<EntryKind> = new Set(UNDOABLE_KINDS);
+
 /** Entries an undo can reverse. */
-export const UNDOABLE: ReadonlySet<EntryKind> = new Set(['bet', 'collect', 'split', 'adjust', 'clear']);
+export const isUndoable = (e: Entry): e is Extract<Entry, { kind: UndoableKind }> => UNDOABLE.has(e.kind);
 
 /** Entries that move chips; each one ends the undo window of the one before. */
 export const MOVES_CHIPS: ReadonlySet<EntryKind> = new Set([
@@ -54,12 +64,12 @@ export function deltasOf(entry: Entry): Deltas {
   const pot = (id: PotId, n: number) => (d.pots[id] = (d.pots[id] ?? 0) + n);
   switch (entry.kind) {
     case 'bet':
-      stack(entry.by!, -entry.amount);
+      stack(entry.by, -entry.amount);
       pot(entry.pot, entry.amount);
       break;
     case 'collect':
       pot(entry.pot, -entry.amount);
-      stack(entry.by!, entry.amount);
+      stack(entry.by, entry.amount);
       break;
     case 'split':
       for (const share of entry.shares) {

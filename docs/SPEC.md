@@ -99,7 +99,8 @@ add a `note` entry; presence is not in the ledger.
   with the name of a seat that is here is refused (`name-taken`).
 - **Here and away.** A seat is here while at least one connection holds its
   key, and away from the moment its last connection closes. The state shows
-  `awaySince` for an away seat. The table's code is the credential: anyone
+  `awaySince` for an away seat and `null` for one that is here; clients read
+  presence from it. `here` repeats it for clients on an older build. The table's code is the credential: anyone
   with it can join, as in version 2.
 - A client keeps each table's seat key on the device, so reopening the table
   goes straight back to the seat.
@@ -156,9 +157,11 @@ Table to client:
 }
 ```
 
-A ledger entry is `{ seq, at, by, kind, ... }` with the fields of its kind
-(`bet`, `collect`, `split`, `adjust`, `undo`, `clear`, `openPot`,
-`closePot`, `handOver`, `note`). Clients render its text.
+A ledger entry is `{ seq, at, by, byName, kind, ... }` with the fields of its
+kind (`bet`, `collect`, `split`, `adjust`, `undo`, `clear`, `openPot`,
+`closePot`, `handOver`, `note`). `by` is the seat that acted; only a note the
+table writes itself, such as an import, has `by: null`. Clients render its
+text.
 
 A socket may send at most 10 frames a second; extra frames are answered
 `nack` with `rate-limited` and dropped. A refused frame's `nack` carries its

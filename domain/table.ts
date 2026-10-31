@@ -1,5 +1,5 @@
 import type { ErrorCode } from './errors.js';
-import { type Deltas, type Entry, MOVES_CHIPS, UNDOABLE, deltasOf, negate } from './ledger.js';
+import { type Deltas, type Entry, MOVES_CHIPS, deltasOf, isUndoable, negate } from './ledger.js';
 import {
   type Chips,
   HOST_CLAIM_AFTER_MS,
@@ -34,7 +34,7 @@ export interface Pot {
 
 export interface Undoable {
   seq: number;
-  by: SeatId | null;
+  by: SeatId;
   deltas: Deltas;
 }
 
@@ -65,14 +65,17 @@ export type Command =
   | { type: 'claimHost' }
   | { type: 'remove'; seat: SeatId };
 
-export type Outcome =
-  | { ok: true; table: Table; entries: Entry[]; seat?: SeatId }
-  | { ok: false; code: ErrorCode };
+type Refused = { ok: false; code: ErrorCode };
+
+export type Outcome = { ok: true; table: Table; entries: Entry[] } | Refused;
+
+/** Opening or joining: the outcome, and on success the seat it gave. */
+export type SeatOutcome = { ok: true; table: Table; entries: Entry[]; seat: SeatId } | Refused;
 
 /** An entry before the table numbers and stamps it. */
 type Draft = Entry extends infer E ? (E extends Entry ? Omit<E, 'seq' | 'at'> : never) : never;
 
-const refuse = (code: ErrorCode): Outcome => ({ ok: false, code });
+const refuse = (code: ErrorCode): Refused => ({ ok: false, code });
 
 export interface NewSeat {
   name: unknown;
@@ -81,7 +84,7 @@ export interface NewSeat {
   now: number;
 }
 
-export function openTable(args: NewSeat & { code: TableCode; buyIn?: unknown }): Outcome {
+export function openTable(args: NewSeat & { code: TableCode; buyIn?: unknown }): SeatOutcome {
   const name = parseSeatName(args.name);
   if (!name.ok) return refuse(name.code);
   const buyIn = parseBuyIn(args.buyIn);
@@ -98,11 +101,11 @@ export function openTable(args: NewSeat & { code: TableCode; buyIn?: unknown }):
     undoable: null,
     lastActivity: args.now,
   };
-  return withSeat(record(table, args.now, [buyInEntry(table, args.seatId, name.value)]), args.seatId);
+  return withSeat(commit(table, args.now, [buyInEntry(table, args.seatId, name.value)]), args.seatId);
 }
 
 /** A new name takes a new seat; the name of an away seat takes that seat over. */
-export function join(table: Table, args: NewSeat): Outcome {
+export function join(table: Table, args: NewSeat): SeatOutcome {
   const name = parseSeatName(args.name);
   if (!name.ok) return refuse(name.code);
   const existing = table.seats.find((s) => sameName(s.name, name.value));
@@ -110,12 +113,12 @@ export function join(table: Table, args: NewSeat): Outcome {
     if (existing.awaySince === null) return refuse('name-taken');
     const claimed = replaceSeat(table, { ...existing, keyHash: args.keyHash });
     const note: Draft = { kind: 'note', note: 'claimed', seat: existing.id, name: existing.name, by: existing.id, byName: existing.name };
-    return withSeat(record(claimed, args.now, [note]), existing.id);
+    return withSeat(commit(claimed, args.now, [note]), existing.id);
   }
   if (table.seats.length >= MAX_SEATS) return refuse('table-full');
   const seat: Seat = { id: args.seatId, name: name.value, stack: 0, keyHash: args.keyHash, awaySince: args.now };
   const seated = { ...table, seats: [...table.seats, seat] };
-  return withSeat(record(seated, args.now, [buyInEntry(seated, seat.id, seat.name)]), seat.id);
+  return withSeat(commit(seated, args.now, [buyInEntry(seated, seat.id, seat.name)]), seat.id);
 }
 
 /** The host's seat is gone, or has been away long enough for another player to take it over. */
@@ -259,7 +262,7 @@ function commit(table: Table, now: number, drafts: Draft[], undoableAfter = true
     const moved = applyDeltas(next, deltas);
     if (!moved) return refuse('bad-amount');
     const undoable =
-      UNDOABLE.has(entry.kind) && undoableAfter && !(entry.kind === 'adjust' && entry.reason === 'buyin')
+      isUndoable(entry) && undoableAfter && !(entry.kind === 'adjust' && entry.reason === 'buyin')
         ? { seq: entry.seq, by: entry.by, deltas }
         : MOVES_CHIPS.has(entry.kind)
           ? null
@@ -268,10 +271,6 @@ function commit(table: Table, now: number, drafts: Draft[], undoableAfter = true
     entries.push(entry);
   }
   return { ok: true, table: next, entries };
-}
-
-function record(table: Table, now: number, drafts: Draft[]): Outcome {
-  return commit(table, now, drafts);
 }
 
 function applyDeltas(table: Table, d: Deltas): Table | null {
@@ -289,7 +288,7 @@ function buyInEntry(table: Table, seat: SeatId, name: string): Draft {
   return { kind: 'adjust', seat, name, delta: table.buyIn, reason: 'buyin', by: seat, byName: name };
 }
 
-function withSeat(outcome: Outcome, seat: SeatId): Outcome {
+function withSeat(outcome: Outcome, seat: SeatId): SeatOutcome {
   return outcome.ok ? { ...outcome, seat } : outcome;
 }
 
