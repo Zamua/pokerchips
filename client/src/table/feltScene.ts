@@ -129,6 +129,7 @@ export class FeltScene {
   private node(value: number): SVGUseElement {
     const u = document.createElementNS(SVG, 'use');
     u.setAttribute('href', `#bet-chip-${chipColor(value)}`);
+    u.dataset.testid = 'felt-chip';
     this.layer.appendChild(u);
     return u;
   }

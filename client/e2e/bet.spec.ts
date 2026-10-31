@@ -28,7 +28,7 @@ test('a bet made with chips: tapped, dragged in, undone, then confirmed', async 
   await drawer.getByRole('button', { name: 'Undo' }).click();
   await expect(readout).toHaveText('200');
 
-  const felt = center((await drawer.locator('.felt').boundingBox())!);
+  const felt = center((await drawer.getByTestId('felt').boundingBox())!);
   await drag(page, chip('500'), felt);
   await expect(readout).toHaveText('700');
 
@@ -36,7 +36,7 @@ test('a bet made with chips: tapped, dragged in, undone, then confirmed', async 
   await drag(page, chip('5'), { x: five.x + 60, y: five.y });
   await expect(readout).toHaveText('700');
 
-  await expect(drawer.locator('.cb-layer use')).toHaveCount(3);
+  await expect(drawer.getByTestId('felt-chip')).toHaveCount(3);
   await drawer.getByRole('button', { name: 'Bet 700 into main pot' }).click();
   await expect(drawer).toBeHidden();
   await expect(myStack(page)).toHaveText('300');
@@ -82,10 +82,10 @@ test('a typed bet puts its chips in, Reset takes them back, and typing is rememb
   await drawer.getByRole('radio', { name: 'Type' }).click();
   for (const d of '350') await drawer.getByRole('button', { name: d, exact: true }).click();
   await expect(readout).toHaveText('350');
-  await expect(drawer.locator('.cb-layer use')).toHaveCount(5);
+  await expect(drawer.getByTestId('felt-chip')).toHaveCount(5);
   await drawer.getByRole('button', { name: 'Reset' }).click();
   await expect(readout).toHaveText('0');
-  await expect(drawer.locator('.cb-layer use')).toHaveCount(0);
+  await expect(drawer.getByTestId('felt-chip')).toHaveCount(0);
 
   await drawer.getByRole('button', { name: 'Close' }).click();
   const again = await openBet(page);
@@ -116,7 +116,7 @@ test('a drawer closes with a swipe down from anywhere in it', async ({ page, bro
     await page.waitForTimeout(250);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
-  const felt = center((await drawer.locator('.felt').boundingBox())!);
+  const felt = center((await drawer.getByTestId('felt').boundingBox())!);
   await swipe(felt, 40);
   await page.waitForTimeout(300);
   await expect(drawer).toBeVisible();

@@ -1,7 +1,7 @@
 import { type Page, expect, test } from '@playwright/test';
 import { PHONE, bet, bot, joinTable, myStack, openTable, pot } from './helpers.js';
 
-const live = (page: Page) => page.locator('.top').getByText('Live');
+const live = (page: Page) => page.getByTestId('connection').getByText('Live');
 
 test('two players through a hand: bet, undo, win, split, a host action, a reconnect', async ({ page: host, browser, baseURL, browserName }) => {
   const guestContext = await browser.newContext({ baseURL, viewport: PHONE, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
@@ -24,7 +24,7 @@ test('two players through a hand: bet, undo, win, split, a host action, a reconn
   await expect(pot(host)).toHaveText('100');
 
   // Its author can undo it.
-  const row = guest.locator('.feed .ev', { hasText: 'You bet 100 into the main pot' });
+  const row = guest.locator('[data-seq]', { hasText: 'You bet 100 into the main pot' });
   await row.getByRole('button', { name: 'Undo' }).click();
   await expect(pot(host)).toHaveText('0');
   await expect(myStack(guest)).toHaveText('1,000');
@@ -67,7 +67,7 @@ test('two players through a hand: bet, undo, win, split, a host action, a reconn
 
   // A bet made while offline is held and goes through after the reconnect.
   await guestContext.setOffline(true);
-  await expect(guest.locator('.top .live')).toHaveText(/Reconnecting|Offline/, { timeout: 15_000 });
+  await expect(guest.getByTestId('connection')).toHaveText(/Reconnecting|Offline/, { timeout: 15_000 });
   await bet(guest, 25);
   // WebKit's emulated offline does not block new WebSockets, so there the bet can land before the network returns.
   if (browserName === 'chromium') await expect(pot(host)).toHaveText('49');
@@ -94,7 +94,7 @@ test('a refused command says why, and a seat claimed elsewhere goes back to the 
     await d.accept();
   });
   await page.locator('[data-player="Dev"]').getByRole('button', { name: 'Remove' }).click();
-  await expect(page.locator('.toast', { hasText: 'Only a player who is away can be removed.' })).toBeVisible();
+  await expect(page.getByRole('status').getByText('Only a player who is away can be removed.')).toBeVisible();
   await page.getByRole('dialog', { name: 'Players' }).getByRole('button', { name: 'Close', exact: true }).click();
 
   // Cara's seat is claimed by name on another phone while this one is away from the table.
@@ -106,7 +106,7 @@ test('a refused command says why, and a seat claimed elsewhere goes back to the 
   await expect(myStack(phone)).toHaveText('500');
 
   await page.goto(`/${code}`);
-  await expect(page.locator('.toast', { hasText: 'This seat is now held on another device' })).toBeVisible();
+  await expect(page.getByRole('status').getByText('This seat is now held on another device')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Join a table' })).toBeVisible();
   await expect(page.getByLabel('Your name')).toHaveValue('Cara');
   dev.close();
@@ -152,7 +152,7 @@ test('a table that no longer exists sends you to the join screen, saying so', as
     localStorage.setItem('pokerchips.tables', JSON.stringify([{ code: 'zz00zz00', name: 'Maya', seatKey: '0'.repeat(32), openedAt: Date.now() }])),
   );
   await page.goto('/zz00zz00');
-  await expect(page.locator('.toast', { hasText: 'That table does not exist any more.' })).toBeVisible();
+  await expect(page.getByRole('status').getByText('That table does not exist any more.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Join a table' })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('pokerchips.tables'))).toBe('[]');
 });

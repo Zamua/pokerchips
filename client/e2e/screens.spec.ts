@@ -42,7 +42,7 @@ test('screens', async ({ page, baseURL }, info) => {
   await page.waitForTimeout(400);
   await shot('bet');
   await page.getByRole('button', { name: 'Bet 125 into main pot' }).click();
-  await expect(page.locator('.flying-chip')).toHaveCount(1);
+  await expect(page.getByTestId('flying-chip')).toHaveCount(1);
   await shot('motion');
 
   await page.getByRole('button', { name: 'Win', exact: true }).click();
@@ -66,7 +66,7 @@ test('screens', async ({ page, baseURL }, info) => {
   // WebKit has the Web Share API, whose sheet never answers headless; Chromium falls back to a toast.
   if (info.project.name === 'chromium') {
     await page.getByRole('button', { name: /^Share table code/ }).click();
-    await expect(page.locator('.toast')).toBeVisible();
+    await expect(page.getByRole('status').getByText(/^(Link copied|Tell them the code)/)).toBeVisible();
     await shot('toast');
   }
 
@@ -116,13 +116,13 @@ test('a crowded table', async ({ page, baseURL }, info) => {
   }
   await bots[1].send({ type: 'adjust', delta: 9_000_000, reason: 'rebuy' });
   for (const b of bots.slice(18)) b.close();
-  await expect(page.locator('.pc.away')).toHaveCount(5);
+  await expect(page.getByRole('button', { name: /, away, / })).toHaveCount(5);
   await page.waitForTimeout(500);
   await shot('table');
-  await page.locator('.screen').evaluate((el) => el.scrollTo(0, 700));
+  await page.getByRole('main').evaluate((el) => el.scrollTo(0, 700));
   await page.waitForTimeout(200);
   await shot('table-2');
-  await page.locator('.screen').evaluate((el) => el.scrollTo(0, 99_999));
+  await page.getByRole('main').evaluate((el) => el.scrollTo(0, 99_999));
   await page.waitForTimeout(200);
   await shot('table-3');
 
@@ -167,10 +167,10 @@ test('a small phone', async ({ page, baseURL }, info) => {
   await page.waitForTimeout(400);
   await shot('table');
   await page.context().setOffline(true);
-  await expect(page.locator('.top .live')).toHaveText('Reconnecting');
+  await expect(page.getByTestId('connection')).toHaveText('Reconnecting');
   await shot('reconnecting');
   await page.context().setOffline(false);
-  await expect(page.locator('.top .live')).toHaveText('Live');
+  await expect(page.getByTestId('connection')).toHaveText('Live');
   await page.getByRole('button', { name: 'Bet', exact: true }).click();
   await keypad(page, 40);
   await page.waitForTimeout(300);
