@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Command, type Outcome, type Table, arrive, depart, execute, join, openTable } from './table.js';
+import { type Command, type Outcome, type Table, arrive, depart, execute, hostClaimable, join, openTable } from './table.js';
 import { HOST_CLAIM_AFTER_MS, MAX_SEATS, MAX_SIDE_POTS } from './values.js';
 
 const T0 = 1_000_000;
@@ -192,6 +192,13 @@ describe('host', () => {
     expect(run(t, 'ben', { type: 'claimHost' }, T0 + HOST_CLAIM_AFTER_MS - 1)).toEqual({ ok: false, code: 'host-here' });
     expect(ok(run(t, 'ben', { type: 'claimHost' }, T0 + HOST_CLAIM_AFTER_MS)).table.host).toBe('ben');
     expect(run(table(), 'ben', { type: 'claimHost' })).toEqual({ ok: false, code: 'host-here' });
+  });
+
+  it('is claimable from a view of the table by the same rule', () => {
+    const view = { host: 'ana', seats: [{ id: 'ana', awaySince: T0 }] };
+    expect(hostClaimable(view, T0 + HOST_CLAIM_AFTER_MS - 1)).toBe(false);
+    expect(hostClaimable(view, T0 + HOST_CLAIM_AFTER_MS)).toBe(true);
+    expect(hostClaimable({ host: 'gone', seats: [] }, T0)).toBe(true);
   });
 
   it('removes an away seat, cashing out its stack first', () => {

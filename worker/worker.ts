@@ -1,13 +1,12 @@
 import { parseTableCode } from '../domain/values.js';
 import type { Env } from './env.js';
+import { STATUS, cellUrl, json } from './http.js';
 import { tableCode } from './secrets.js';
 
 export { TableCell } from './TableCell.js';
 
 const MAX_BODY = 4_096;
 const OPEN_ATTEMPTS = 5;
-
-const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 export default {
   async fetch(request, env): Promise<Response> {
@@ -29,11 +28,11 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
     if (!body) return json({ error: 'bad-frame' }, 400);
     for (let i = 0; i < OPEN_ATTEMPTS; i++) {
       const code = tableCode();
-      const res = await table(env, code).fetch('https://table/open', {
+      const res = await table(env, code).fetch(cellUrl('open'), {
         method: 'POST',
         body: JSON.stringify({ code, name: body.name, buyIn: body.buyIn }),
       });
-      if (res.status !== 409) return res;
+      if (res.status !== STATUS.exists) return res;
     }
     return json({ error: 'bad-code' }, 503);
   }
@@ -43,14 +42,14 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
   const stub = table(env, code.value);
   switch (`${request.method} ${parts[3] ?? ''}`) {
     case 'GET ':
-      return stub.fetch('https://table/info');
+      return stub.fetch(cellUrl('info'));
     case 'POST seats': {
       const body = await readBody(request);
       if (!body) return json({ error: 'bad-frame' }, 400);
-      return stub.fetch('https://table/seats', { method: 'POST', body: JSON.stringify({ name: body.name }) });
+      return stub.fetch(cellUrl('seats'), { method: 'POST', body: JSON.stringify({ name: body.name }) });
     }
     case 'GET socket':
-      return stub.fetch(new Request('https://table/socket', request));
+      return stub.fetch(new Request(cellUrl('socket'), request));
     default:
       return json({ error: 'not-found' }, 404);
   }

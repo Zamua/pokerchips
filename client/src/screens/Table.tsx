@@ -2,7 +2,7 @@ import { ArrowsClockwiseIcon, DotsThreeOutlineIcon, ExportIcon, HandCoinsIcon, P
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entry } from '../../../domain/ledger.js';
 import type { Command } from '../../../domain/table.js';
-import { MAX_SEATS } from '../../../domain/values.js';
+import { MAIN_POT, MAX_SEATS } from '../../../domain/values.js';
 import type { SeatView, TableView } from '../../../protocol/frames.js';
 import { api } from '../net/api.js';
 import type { Status } from '../net/tableSocket.js';
@@ -41,7 +41,7 @@ export function Table({ code, seatKey, onLost }: { code: string; seatKey: string
   const toast = useToast();
   const now = useNow(30_000);
   const [panel, setPanel] = useState<Panel | null>(null);
-  const lastPot = useRef('main');
+  const lastPot = useRef<string>(MAIN_POT);
   const close = useCallback(() => setPanel(null), []);
 
   useEffect(() => {
@@ -329,7 +329,7 @@ function Pots({ state }: { state: TableView }) {
       {state.pots.map((p) => {
         const name = potName(p.id);
         const text = chips(p.amount);
-        const main = p.id === 'main';
+        const main = p.id === MAIN_POT;
         return (
           <div key={p.id} className={`card pot ${main ? 'main' : 'side'}${p.amount === 0 ? ' empty' : ''}`} data-pot={p.id}>
             <div className="pl">{name[0].toUpperCase() + name.slice(1)}</div>

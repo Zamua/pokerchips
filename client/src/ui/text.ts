@@ -1,19 +1,20 @@
 import type { ErrorCode } from '../../../domain/errors.js';
 import type { Entry } from '../../../domain/ledger.js';
+import { CODE_LENGTH, MAIN_POT, MAX_SEATS, MAX_SIDE_POTS, NAME_MAX, sidePotNumber } from '../../../domain/values.js';
 
 const SENTENCES: Record<ErrorCode | 'network', string> = {
-  'bad-name': 'Names are 1 to 20 letters, digits, spaces or - _ \' .',
+  'bad-name': `Names are 1 to ${NAME_MAX} letters, digits, spaces or - _ ' .`,
   'bad-amount': 'That amount does not work.',
-  'bad-code': 'A table code is 8 letters and digits.',
+  'bad-code': `A table code is ${CODE_LENGTH} letters and digits.`,
   'not-found': 'That table does not exist any more.',
   'name-taken': 'Someone at the table already has that name.',
-  'table-full': 'The table is full (24 seats).',
+  'table-full': `The table is full (${MAX_SEATS} seats).`,
   'not-host': 'Only the host can do that.',
   'no-such-seat': 'That player has left the table.',
   'no-such-pot': 'That pot is gone.',
   'short-stack': 'You do not have that many chips.',
   'short-pot': 'The pot does not hold that much any more.',
-  'too-many-pots': 'A table has at most 8 side pots.',
+  'too-many-pots': `A table has at most ${MAX_SIDE_POTS} side pots.`,
   'main-pot': 'The main pot cannot close.',
   'not-undoable': 'Too late to undo that.',
   'host-here': 'The host is still here.',
@@ -27,7 +28,7 @@ export const sentence = (code: ErrorCode | 'network') => SENTENCES[code];
 
 export const chips = (n: number) => n.toLocaleString('en-US');
 
-export const potName = (id: string) => (id === 'main' ? 'main pot' : `side pot ${id.slice('side-'.length)}`);
+export const potName = (id: string) => (id === MAIN_POT ? 'main pot' : `side pot ${sidePotNumber(id)}`);
 
 /** 8-character codes read best in two groups: "7b2e41c9" shows as "7B2E 41C9". */
 export const showCode = (code: string) => `${code.slice(0, 4)} ${code.slice(4)}`.toUpperCase();

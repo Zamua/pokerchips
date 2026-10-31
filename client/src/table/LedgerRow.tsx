@@ -13,7 +13,7 @@ import {
   UserMinusIcon,
   UserPlusIcon,
 } from '@phosphor-icons/react';
-import type { Entry } from '../../../domain/ledger.js';
+import type { Entry, EntryKind } from '../../../domain/ledger.js';
 import { ago, describe, emphasize } from '../ui/text.js';
 
 function Icon({ e }: { e: Entry }) {
@@ -64,7 +64,7 @@ function Icon({ e }: { e: Entry }) {
   }
 }
 
-const QUIET = new Set(['note', 'openPot', 'closePot', 'handOver', 'undo']);
+const QUIET: ReadonlySet<EntryKind> = new Set(['note', 'openPot', 'closePot', 'handOver', 'undo']);
 
 /** One ledger entry: what happened, and Undo where it would work, else how long ago. */
 export function LedgerRow({ e, me, now, undoable, onUndo }: { e: Entry; me: string | null; now: number; undoable: boolean; onUndo(seq: number): void }) {

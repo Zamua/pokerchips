@@ -1,5 +1,6 @@
 import { PokerChipIcon } from '@phosphor-icons/react';
 import { useEffect, useReducer, useState } from 'react';
+import { MAIN_POT } from '../../../domain/values.js';
 import type { SeatView, TableView } from '../../../protocol/frames.js';
 import { type BetMode, profile } from '../store/profile.js';
 import { Drawer, PotPicker, confirmClass } from '../ui/Drawer.js';
@@ -24,7 +25,7 @@ export function BetDrawer({
   const [b, dispatch] = useReducer(bet, null, () => startBet(me.stack, quickChips(state.buyIn)));
   useEffect(() => dispatch({ t: 'restart', stack: me.stack }), [me.stack]);
   const [mode, setMode] = useState<BetMode>(profile.betMode);
-  const pot = state.pots.some((p) => p.id === chosen) ? chosen : 'main';
+  const pot = state.pots.some((p) => p.id === chosen) ? chosen : MAIN_POT;
   const over = b.amount > me.stack;
   const label = `Bet ${chips(b.amount)} into ${potName(pot)}`;
 

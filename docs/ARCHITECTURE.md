@@ -62,7 +62,10 @@ and the chips flying between them).
   its seat once `hello` succeeds, so presence is "any open socket holding
   this seat". `ping` is an auto-response and never wakes the table.
 - **Expiry.** An alarm set 30 days after the last activity deletes the
-  table's storage when it fires and no socket is open.
+  table's storage when it fires and no socket is open; otherwise it checks
+  again an hour later. `TableService` decides when; the cell only sets the
+  alarm. The Worker and the cell share their internal routes and refusal
+  statuses from `worker/http.ts`.
 
 ## Moving from version 2
 
