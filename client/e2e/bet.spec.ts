@@ -57,8 +57,14 @@ test('the tray is the stack in chips, and a used-up value gets change from a lar
   for (let i = 0; i < 5; i++) await chip('100').click();
   await expect(readout).toHaveText('800');
   await expect(chip('100')).toBeDisabled();
+  // Sampled as the tap lands: the shake lasts a fifth of a second.
+  await chip('100').evaluate((el) => {
+    (window as unknown as { shook: Promise<boolean> }).shook = new Promise((resolve) =>
+      addEventListener('click', () => resolve(el.getAnimations().length > 0), { once: true }),
+    );
+  });
   await chip('100').click({ force: true });
-  expect(await chip('100').evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as unknown as { shook: Promise<boolean> }).shook)).toBe(true);
   await expect(readout).toHaveText('800');
   await drawer.getByRole('button', { name: 'Reset' }).click();
   await left('100', 3);
