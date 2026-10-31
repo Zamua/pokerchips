@@ -13,6 +13,10 @@ interface Attachment {
   seat: string | null;
 }
 
+/** A table's use cases over its Durable Object's storage, on the wall clock. */
+export const tableService = (storage: DurableObjectStorage, publisher: Publisher) =>
+  new TableService(new SqlTableStore(storage), publisher, { now: () => Date.now() }, secrets);
+
 /** The actor that owns one table: its storage, its sockets, its expiry. */
 export class TableCell extends DurableObject<Env> {
   private readonly service: TableService;
@@ -21,7 +25,7 @@ export class TableCell extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const publisher: Publisher = { broadcast: (frame) => this.broadcast(frame) };
-    this.service = new TableService(new SqlTableStore(ctx.storage), publisher, { now: () => Date.now() }, secrets);
+    this.service = tableService(ctx.storage, publisher);
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
   }
 
