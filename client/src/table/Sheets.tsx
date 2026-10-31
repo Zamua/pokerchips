@@ -20,7 +20,7 @@ import type { Entry } from '../../../domain/ledger.js';
 import type { Command } from '../../../domain/table.js';
 import { hostClaimable } from '../../../domain/table.js';
 import { LEDGER_TAIL, MAIN_POT, MAX_SIDE_POTS } from '../../../domain/values.js';
-import type { SeatView, TableView } from '../../../protocol/frames.js';
+import { type SeatView, type TableView, isHere } from '../../../protocol/frames.js';
 import { ChipTop } from '../ui/Chip.js';
 import { Drawer } from '../ui/Drawer.js';
 import { ago, chips, initial, potName } from '../ui/text.js';
@@ -41,7 +41,7 @@ export function Badges({ seat, state, me }: { seat: SeatView; state: TableView; 
           HOST
         </span>
       )}
-      {!seat.here && (
+      {!isHere(seat) && (
         <span className="badge b-away">
           <MoonIcon size={11} weight="bold" />
           AWAY
@@ -148,7 +148,7 @@ export function PlayersSheet({
     <Drawer title="Players" sub={`${state.seats.length} at the table`} label="Players" onClose={onClose}>
       {claimable && (
         <div className="banner">
-          <span>{host ? `${host.name}, the host, has been away for ${ago(host.awaySince!, now)}.` : 'The table has no host.'}</span>
+          <span>{host && host.awaySince !== null ? `${host.name}, the host, has been away for ${ago(host.awaySince, now)}.` : 'The table has no host.'}</span>
           <button className="mini" onClick={() => void run({ type: 'claimHost' })}>
             <CrownSimpleIcon size={15} weight="fill" />
             Claim host
@@ -159,13 +159,13 @@ export function PlayersSheet({
         {state.seats.map((s) => (
           <div className="prow" key={s.id} data-player={s.name}>
             <div className="top1">
-              <ChipTop color={s.here ? seatColor(s.id, state.seats) : 'mist'} label={initial(s.name)} size={36} />
+              <ChipTop color={isHere(s) ? seatColor(s.id, state.seats) : 'mist'} label={initial(s.name)} size={36} />
               <div className="who">
                 <div className="nm">
                   <span>{s.name}</span>
                   <Badges seat={s} state={state} me={me} />
                 </div>
-                <div className="sub">{s.here ? 'Here' : awayFor(s.awaySince ?? now, now)}</div>
+                <div className="sub">{s.awaySince === null ? 'Here' : awayFor(s.awaySince, now)}</div>
               </div>
               <div className="st">{chips(s.stack)}</div>
             </div>
@@ -184,7 +184,7 @@ export function PlayersSheet({
                   <PencilSimpleIcon size={15} weight="bold" />
                   Adjust
                 </button>
-                {!s.here && (
+                {!isHere(s) && (
                   <button
                     className="mini danger"
                     onClick={() => {

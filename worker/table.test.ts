@@ -183,9 +183,9 @@ describe('a table over WebSockets', () => {
     const b = await joinTable(t.code, 'Ben');
     const ana = await Client.seated(t.code, t.seatKey);
     const ben = await Client.seated(t.code, b.seatKey);
-    await ana.stateWhere((s) => s.seats.every((x) => x.here));
+    await ana.stateWhere((s) => s.seats.every((x) => x.awaySince === null));
     ben.ws.close(1000, 'bye');
-    const s = await ana.stateWhere((st) => !st.seats.find((x) => x.name === 'Ben')!.here);
+    const s = await ana.stateWhere((st) => st.seats.find((x) => x.name === 'Ben')!.awaySince !== null);
     expect(s.seats.find((x) => x.name === 'Ben')!.awaySince).toEqual(expect.any(Number));
   });
 

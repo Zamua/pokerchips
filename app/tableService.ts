@@ -1,7 +1,7 @@
 import type { ErrorCode } from '../domain/errors.js';
 import { type LegacyRoom, importLegacy } from '../domain/legacy.js';
 import type { Entry } from '../domain/ledger.js';
-import { type Command, type Outcome, type Table, arrive, depart, execute, join, openTable, seatByKeyHash } from '../domain/table.js';
+import { type Command, type SeatOutcome, type Table, arrive, depart, execute, join, openTable, seatByKeyHash } from '../domain/table.js';
 import { IDLE_LIFETIME_MS, LEDGER_TAIL, type SeatId, type TableCode } from '../domain/values.js';
 import { type TableView, viewOf } from '../protocol/frames.js';
 import type { Answer, Clock, Publisher, Secrets, TableStore } from './ports.js';
@@ -124,10 +124,10 @@ export class TableService {
     return table && viewOf(table, this.store.ledgerTail());
   }
 
-  private seat(o: Outcome, seatKey: string): Seated {
+  private seat(o: SeatOutcome, seatKey: string): Seated {
     if (!o.ok) return o;
     this.store.save(o.table, o.entries);
-    return { ok: true, seatId: o.seat!, seatKey };
+    return { ok: true, seatId: o.seat, seatKey };
   }
 
   private publish(): void {

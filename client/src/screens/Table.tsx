@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entry } from '../../../domain/ledger.js';
 import type { Command } from '../../../domain/table.js';
 import { MAIN_POT, MAX_SEATS } from '../../../domain/values.js';
-import type { SeatView, TableView } from '../../../protocol/frames.js';
+import { type SeatView, type TableView, isHere } from '../../../protocol/frames.js';
 import { api } from '../net/api.js';
 import type { Status } from '../net/tableSocket.js';
 import { useTable } from '../net/useTable.js';
@@ -347,9 +347,9 @@ function Pots({ state }: { state: TableView }) {
 function SeatCard({ seat, state, me, onOpen }: { seat: SeatView; state: TableView; me: string; onOpen(): void }) {
   const text = chips(seat.stack);
   return (
-    <button className={`pc${seat.here ? '' : ' away'}`} data-seat={seat.id} onClick={onOpen} aria-label={`${seat.name}, ${text} chips`}>
+    <button className={`pc${isHere(seat) ? '' : ' away'}`} data-seat={seat.id} onClick={onOpen} aria-label={`${seat.name}, ${text} chips`}>
       <div className="r1">
-        <ChipTop color={seat.here ? seatColor(seat.id, state.seats) : 'mist'} label={initial(seat.name)} size={34} />
+        <ChipTop color={isHere(seat) ? seatColor(seat.id, state.seats) : 'mist'} label={initial(seat.name)} size={34} />
         <span className="bdg">
           <Badges seat={seat} state={state} me={me} />
         </span>
