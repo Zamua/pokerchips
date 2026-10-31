@@ -1,20 +1,41 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { Stack } from './Chip.js';
 import { chipAt, disturbed, drawOrder, homes, homeward, kick, type Pose, restingOn, visualAngle } from './toy.js';
-import { chipSize } from './towers.js';
+import { type ChipColor, chipSize } from './towers.js';
 
 const size = chipSize(54);
 const flat = (x: number, y: number): Pose => ({ x, y, angle: 0 });
 /** A stack of `n` level chips on the ground line, bottom first. */
 const column = (x: number, n: number, ground = 300) => Array.from({ length: n }, (_, i) => flat(x, ground - (i + 0.5) * size.th));
+/** The chip centers a static stack draws, bottom first, in its drawing's coordinates. */
+const drawn = (colors: ChipColor[]) =>
+  [...renderToStaticMarkup(createElement(Stack, { colors, width: size.w })).matchAll(/translate\(([-\d.e]+) ([-\d.e]+)\)/g)].map((m) => ({
+    x: Number(m[1]),
+    y: Number(m[2]),
+  }));
 
 describe('the chip toy', () => {
   it('rests every chip where the static stacks draw it', () => {
-    const h = homes([['tomato', 'sun'], ['mint']], 390, 300, size);
-    expect(h).toHaveLength(3);
-    const left = (390 - (2 * 54 + 14)) / 2;
-    expect(h[0]).toMatchObject({ color: 'tomato', stack: 0, level: 0, x: left + 7 + 27, y: 300 - size.th / 2, angle: 0 });
-    expect(h[1]).toMatchObject({ color: 'sun', stack: 0, level: 1, x: left + 7 + 2 + 27, y: 300 - 1.5 * size.th });
-    expect(h[2]).toMatchObject({ stack: 1, level: 0, x: left + 54 + 7 + 27 });
+    const stacks: ChipColor[][] = [['tomato', 'sun', 'mint', 'ink', 'paper'], ['mint', 'sky']];
+    const h = homes(stacks, 390, 300, size);
+    expect(h.map((c) => c.color)).toEqual(stacks.flat());
+    for (const [s, colors] of stacks.entries()) {
+      const art = drawn(colors);
+      const mine = h.filter((c) => c.stack === s);
+      expect(mine.map((c) => c.level)).toEqual(colors.map((_, i) => i));
+      for (const [i, c] of mine.entries()) {
+        expect(c.x - mine[0].x).toBeCloseTo(art[i].x - art[0].x);
+        expect(c.y - mine[0].y).toBeCloseTo(art[i].y - art[0].y);
+        expect(c.angle).toBe(0);
+      }
+    }
+    const [a, b] = h.filter((c) => c.level === 0);
+    expect(a.y + size.th / 2).toBeCloseTo(300);
+    expect(b.y).toBe(a.y);
+    expect(b.x - a.x).toBeCloseTo(size.w);
+    expect((a.x + b.x) / 2).toBeCloseTo(390 / 2);
   });
 
   it('tips a tapped column away from the tapped side, its top fastest', () => {

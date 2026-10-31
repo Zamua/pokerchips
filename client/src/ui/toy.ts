@@ -1,4 +1,4 @@
-import { type ChipColor, type ChipSize, STACK_JITTER } from './towers.js';
+import { type ChipColor, type ChipSize, stackJitter } from './towers.js';
 
 /**
  * The landing page's chip toy, the pure part: where chips rest, what a tap
@@ -24,21 +24,19 @@ export interface Kick {
   spin: number;
 }
 
-/** A static stack's drawing is this much wider than a chip on each side; neighbors overlap by both. */
-const MARGIN = 7;
-
 /**
- * Where each chip of a row of stacks rests: the places the static stacks draw
- * them, centered across `width`, the bottom chips' edges on `ground`.
+ * Where each chip of a row of stacks rests: each stack shaped as a static
+ * stack draws it, the row centered across `width` a chip apart, the bottom
+ * chips' edges on `ground`.
  */
 export function homes(stacks: readonly (readonly ChipColor[])[], width: number, ground: number, size: ChipSize): Home[] {
-  const left = (width - (stacks.length * size.w + 2 * MARGIN)) / 2;
+  const first = (width - (stacks.length - 1) * size.w) / 2;
   return stacks.flatMap((colors, stack) =>
     colors.map((color, level) => ({
       color,
       stack,
       level,
-      x: left + stack * size.w + MARGIN + STACK_JITTER[level % STACK_JITTER.length] + size.w / 2,
+      x: first + stack * size.w + stackJitter(level),
       y: ground - (level + 0.5) * size.th,
       angle: 0,
     })),

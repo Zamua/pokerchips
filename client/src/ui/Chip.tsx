@@ -1,4 +1,4 @@
-import { COLORS, type ChipColor, chipSize, markOn, STACK_JITTER, towerOf, type TowerShape } from './towers.js';
+import { COLORS, type ChipColor, chipSize, markOn, stackJitter, towerOf, type TowerShape } from './towers.js';
 
 const INK = COLORS.ink;
 
@@ -43,7 +43,7 @@ export function Stack({ colors, width, wobble = true }: { colors: ChipColor[]; w
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
       {colors.map((c, i) => {
-        const dx = pad + 4 + (wobble ? STACK_JITTER[i % STACK_JITTER.length] : 0);
+        const dx = pad + 4 + (wobble ? stackJitter(i) : 0);
         const yc = H - pad - ry - (i + 1) * th;
         return (
           <g key={i} transform={`translate(${dx + w / 2} ${yc + th / 2})`}>
