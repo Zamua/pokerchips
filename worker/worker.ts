@@ -1,4 +1,5 @@
 import { parseTableCode } from '../domain/values.js';
+import { parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
 import type { Env } from './env.js';
 import { STATUS, cellUrl, json } from './http.js';
 import { tableCode } from './secrets.js';
@@ -24,13 +25,13 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
 
   if (parts.length === 2) {
     if (request.method !== 'POST') return json({ error: 'bad-frame' }, 405);
-    const body = await readBody(request);
-    if (!body) return json({ error: 'bad-frame' }, 400);
+    const req = parseOpenRequest(await readJson(request));
+    if (!req.ok) return json({ error: req.code }, 400);
     for (let i = 0; i < OPEN_ATTEMPTS; i++) {
       const code = tableCode();
       const res = await table(env, code).fetch(cellUrl('open'), {
         method: 'POST',
-        body: JSON.stringify({ code, name: body.name, buyIn: body.buyIn }),
+        body: JSON.stringify({ code, ...req.value }),
       });
       if (res.status !== STATUS.exists) return res;
     }
@@ -44,9 +45,9 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
     case 'GET ':
       return stub.fetch(cellUrl('info'));
     case 'POST seats': {
-      const body = await readBody(request);
-      if (!body) return json({ error: 'bad-frame' }, 400);
-      return stub.fetch(cellUrl('seats'), { method: 'POST', body: JSON.stringify({ name: body.name }) });
+      const req = parseJoinRequest(await readJson(request));
+      if (!req.ok) return json({ error: req.code }, 400);
+      return stub.fetch(cellUrl('seats'), { method: 'POST', body: JSON.stringify(req.value) });
     }
     case 'GET socket':
       return stub.fetch(new Request(cellUrl('socket'), request));
@@ -66,13 +67,13 @@ function originAllowed(request: Request, url: URL, env: Env): boolean {
   return env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).includes(origin);
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown> | null> {
+/** The body as JSON, or undefined when it is too large or not JSON; the request parsers refuse undefined. */
+async function readJson(request: Request): Promise<unknown> {
   const text = await request.text();
-  if (text.length > MAX_BODY) return null;
+  if (text.length > MAX_BODY) return undefined;
   try {
-    const v: unknown = JSON.parse(text);
-    return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+    return JSON.parse(text);
   } catch {
-    return null;
+    return undefined;
   }
 }

@@ -1,6 +1,11 @@
 import type { ErrorCode } from './errors.js';
 
-export type TableCode = string;
+declare const brand: unique symbol;
+/** A string only its parser makes, so holding one means it was checked. */
+type Brand<B extends string> = string & { readonly [brand]: B };
+
+export type TableCode = Brand<'TableCode'>;
+export type SeatName = Brand<'SeatName'>;
 export type SeatId = string;
 export type PotId = string;
 export type Chips = number;
@@ -31,13 +36,13 @@ const refuse = (code: ErrorCode): Parsed<never> => ({ ok: false, code });
 export function parseTableCode(input: unknown): Parsed<TableCode> {
   if (typeof input !== 'string') return refuse('bad-code');
   const code = input.trim().toLowerCase();
-  return CODE.test(code) ? ok(code) : refuse('bad-code');
+  return CODE.test(code) ? ok(code as TableCode) : refuse('bad-code');
 }
 
-export function parseSeatName(input: unknown): Parsed<string> {
+export function parseSeatName(input: unknown): Parsed<SeatName> {
   if (typeof input !== 'string') return refuse('bad-name');
   const name = input.trim();
-  return NAME.test(name) ? ok(name) : refuse('bad-name');
+  return NAME.test(name) ? ok(name as SeatName) : refuse('bad-name');
 }
 
 export function sameName(a: string, b: string): boolean {
