@@ -3,7 +3,7 @@ import { type LegacyRoom, importLegacy } from '../domain/legacy.js';
 import type { Entry } from '../domain/ledger.js';
 import { type Command, type SeatOutcome, type Table, arrive, depart, execute, join, openTable, seatByKeyHash } from '../domain/table.js';
 import { IDLE_LIFETIME_MS, LEDGER_TAIL, type SeatId, type TableCode } from '../domain/values.js';
-import { type TableView, viewOf } from '../protocol/frames.js';
+import { type JoinRequest, type OpenRequest, type TableView, viewOf } from '../protocol/frames.js';
 import type { Answer, Clock, Publisher, Secrets, TableStore } from './ports.js';
 
 /** An expiry check that finds the table still in use waits this long before the next. */
@@ -23,7 +23,7 @@ export class TableService {
     private readonly secrets: Secrets,
   ) {}
 
-  async open(code: TableCode, name: unknown, buyIn: unknown): Promise<Seated> {
+  async open(code: TableCode, { name, buyIn }: OpenRequest): Promise<Seated> {
     const seatKey = this.secrets.seatKey();
     const keyHash = await this.secrets.hash(seatKey);
     if (this.store.load()) return { ok: false, code: 'exists' };
@@ -32,7 +32,7 @@ export class TableService {
     return this.seat(o, seatKey);
   }
 
-  async join(name: unknown): Promise<Seated> {
+  async join({ name }: JoinRequest): Promise<Seated> {
     const seatKey = this.secrets.seatKey();
     const keyHash = await this.secrets.hash(seatKey);
     const table = this.store.load();

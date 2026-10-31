@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { type Command, type Outcome, type SeatOutcome, type Table, arrive, depart, execute, hostClaimable, join, openTable } from './table.js';
-import { HOST_CLAIM_AFTER_MS, MAX_SEATS, MAX_SIDE_POTS } from './values.js';
+import { BUY_IN_DEFAULT, HOST_CLAIM_AFTER_MS, MAX_SEATS, MAX_SIDE_POTS, type Parsed, parseSeatName, parseTableCode } from './values.js';
 
 const T0 = 1_000_000;
+
+const parsed = <T>(p: Parsed<T>): T => {
+  if (!p.ok) throw new Error(`refused: ${p.code}`);
+  return p.value;
+};
+const name = (s: string) => parsed(parseSeatName(s));
+const CODE = parsed(parseTableCode('abcd1234'));
 
 function ok<O extends Outcome | SeatOutcome>(outcome: O): Extract<O, { ok: true }> {
   if (!outcome.ok) throw new Error(`refused: ${outcome.code}`);
@@ -11,9 +18,9 @@ function ok<O extends Outcome | SeatOutcome>(outcome: O): Extract<O, { ok: true 
 
 /** Ana hosts with a 1,000 buy-in; Ben and Cara joined; all three are here. */
 function table(): Table {
-  let t = ok(openTable({ code: 'abcd1234', name: 'Ana', seatId: 'ana', keyHash: 'ka', now: T0 })).table;
-  t = ok(join(t, { name: 'Ben', seatId: 'ben', keyHash: 'kb', now: T0 })).table;
-  t = ok(join(t, { name: 'Cara', seatId: 'cara', keyHash: 'kc', now: T0 })).table;
+  let t = ok(openTable({ code: CODE, name: name('Ana'), seatId: 'ana', keyHash: 'ka', now: T0, buyIn: BUY_IN_DEFAULT })).table;
+  t = ok(join(t, { name: name('Ben'), seatId: 'ben', keyHash: 'kb', now: T0 })).table;
+  t = ok(join(t, { name: name('Cara'), seatId: 'cara', keyHash: 'kc', now: T0 })).table;
   for (const id of ['ana', 'ben', 'cara']) t = arrive(t, id, T0);
   return t;
 }
@@ -26,7 +33,7 @@ const inPlay = (t: Table) => t.seats.reduce((n, s) => n + s.stack, 0) + t.pots.r
 
 describe('opening and joining', () => {
   it('seats the host with the buy-in, recorded as an adjust', () => {
-    const o = ok(openTable({ code: 'abcd1234', name: ' Ana ', seatId: 'ana', keyHash: 'ka', now: T0, buyIn: 500 }));
+    const o = ok(openTable({ code: CODE, name: name(' Ana '), seatId: 'ana', keyHash: 'ka', now: T0, buyIn: 500 }));
     expect(o.table.seats).toEqual([{ id: 'ana', name: 'Ana', stack: 500, keyHash: 'ka', awaySince: T0 }]);
     expect(o.table.host).toBe('ana');
     expect(o.table.pots).toEqual([{ id: 'main', amount: 0 }]);
@@ -34,24 +41,14 @@ describe('opening and joining', () => {
     expect(o.seat).toBe('ana');
   });
 
-  it('refuses a bad name or buy-in', () => {
-    const base = { code: 'abcd1234', seatId: 'a', keyHash: 'k', now: T0 };
-    for (const name of ['', '   ', 'x'.repeat(21), 'a<b', 42]) {
-      expect(openTable({ ...base, name })).toEqual({ ok: false, code: 'bad-name' });
-    }
-    for (const buyIn of [0, -1, 1.5, 1_000_001, '100']) {
-      expect(openTable({ ...base, name: 'Ana', buyIn })).toEqual({ ok: false, code: 'bad-amount' });
-    }
-  });
-
   it('refuses a name that is here, ignoring case', () => {
-    expect(join(table(), { name: 'BEN', seatId: 'x', keyHash: 'kx', now: T0 })).toEqual({ ok: false, code: 'name-taken' });
+    expect(join(table(), { name: name('BEN'), seatId: 'x', keyHash: 'kx', now: T0 })).toEqual({ ok: false, code: 'name-taken' });
   });
 
   it('hands an away seat to whoever joins with its name, with a new key and its stack', () => {
     let t = ok(run(table(), 'ben', { type: 'bet', pot: 'main', amount: 100 })).table;
     t = depart(t, 'ben', T0 + 2);
-    const o = ok(join(t, { name: 'ben', seatId: 'unused', keyHash: 'kb2', now: T0 + 3 }));
+    const o = ok(join(t, { name: name('ben'), seatId: 'unused', keyHash: 'kb2', now: T0 + 3 }));
     expect(o.seat).toBe('ben');
     const ben = o.table.seats.find((s) => s.id === 'ben')!;
     expect(ben).toMatchObject({ keyHash: 'kb2', stack: 900 });
@@ -61,8 +58,8 @@ describe('opening and joining', () => {
 
   it(`holds at most ${MAX_SEATS} seats`, () => {
     let t = table();
-    for (let i = 3; i < MAX_SEATS; i++) t = ok(join(t, { name: `p${i}`, seatId: `s${i}`, keyHash: `k${i}`, now: T0 })).table;
-    expect(join(t, { name: 'late', seatId: 'z', keyHash: 'kz', now: T0 })).toEqual({ ok: false, code: 'table-full' });
+    for (let i = 3; i < MAX_SEATS; i++) t = ok(join(t, { name: name(`p${i}`), seatId: `s${i}`, keyHash: `k${i}`, now: T0 })).table;
+    expect(join(t, { name: name('late'), seatId: 'z', keyHash: 'kz', now: T0 })).toEqual({ ok: false, code: 'table-full' });
   });
 });
 
@@ -111,7 +108,6 @@ describe('moving chips', () => {
     expect(stack(t, 'cara')).toBe(0);
     expect(run(t, 'cara', { type: 'adjust', delta: -1, reason: 'cashout' })).toEqual({ ok: false, code: 'short-stack' });
     expect(run(t, 'cara', { type: 'adjust', delta: 0, reason: 'rebuy' })).toEqual({ ok: false, code: 'bad-amount' });
-    expect(run(t, 'cara', { type: 'adjust', delta: 5, reason: 'buyin' as 'rebuy' })).toEqual({ ok: false, code: 'bad-frame' });
   });
 });
 

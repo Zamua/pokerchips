@@ -1,7 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Publisher } from '../app/ports.js';
 import { TableService } from '../app/tableService.js';
-import { PING, PONG, type ServerFrame, opOf, parseClientFrame } from '../protocol/frames.js';
+import { parseTableCode } from '../domain/values.js';
+import { PING, PONG, type ServerFrame, opOf, parseClientFrame, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
 import type { Env } from './env.js';
 import { CELL_ROUTES, STATUS, json } from './http.js';
 import { RateLimit } from './rateLimit.js';
@@ -35,10 +36,14 @@ export class TableCell extends DurableObject<Env> {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return json({ error: 'bad-frame' }, 400);
     if (pathname === CELL_ROUTES.open) {
-      const seated = await this.service.open(String(body.code), body.name, body.buyIn);
+      const code = parseTableCode(body.code);
+      if (!code.ok) return json({ error: code.code }, 400);
+      const req = parseOpenRequest(body);
+      if (!req.ok) return json({ error: req.code }, 400);
+      const seated = await this.service.open(code.value, req.value);
       if (!seated.ok) return json({ error: seated.code }, STATUS[seated.code] ?? 400);
       await this.arm();
-      return json({ code: body.code, seatId: seated.seatId, seatKey: seated.seatKey }, 201);
+      return json({ code: code.value, seatId: seated.seatId, seatKey: seated.seatKey }, 201);
     }
     if (pathname === CELL_ROUTES.import) {
       const room = body.room as Record<string, unknown> | undefined;
@@ -49,7 +54,9 @@ export class TableCell extends DurableObject<Env> {
       return json({ code: room.id, seats: done.seats }, 201);
     }
     if (pathname === CELL_ROUTES.seats) {
-      const seated = await this.service.join(body.name);
+      const req = parseJoinRequest(body);
+      if (!req.ok) return json({ error: req.code }, 400);
+      const seated = await this.service.join(req.value);
       if (!seated.ok) return json({ error: seated.code }, STATUS[seated.code] ?? 400);
       return json({ seatId: seated.seatId, seatKey: seated.seatKey }, 201);
     }

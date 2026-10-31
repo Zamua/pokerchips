@@ -9,10 +9,9 @@ import {
   type PotId,
   type SeatId,
   type TableCode,
+  type SeatName,
   parseAmount,
-  parseBuyIn,
   parseDelta,
-  parseSeatName,
   sameName,
   sidePotId,
 } from './values.js';
@@ -78,37 +77,31 @@ type Draft = Entry extends infer E ? (E extends Entry ? Omit<E, 'seq' | 'at'> : 
 const refuse = (code: ErrorCode): Refused => ({ ok: false, code });
 
 export interface NewSeat {
-  name: unknown;
+  name: SeatName;
   seatId: SeatId;
   keyHash: string;
   now: number;
 }
 
-export function openTable(args: NewSeat & { code: TableCode; buyIn?: unknown }): SeatOutcome {
-  const name = parseSeatName(args.name);
-  if (!name.ok) return refuse(name.code);
-  const buyIn = parseBuyIn(args.buyIn);
-  if (!buyIn.ok) return refuse(buyIn.code);
+export function openTable(args: NewSeat & { code: TableCode; buyIn: Chips }): SeatOutcome {
   const table: Table = {
     code: args.code,
     createdAt: args.now,
-    buyIn: buyIn.value,
+    buyIn: args.buyIn,
     host: args.seatId,
-    seats: [{ id: args.seatId, name: name.value, stack: 0, keyHash: args.keyHash, awaySince: args.now }],
+    seats: [{ id: args.seatId, name: args.name, stack: 0, keyHash: args.keyHash, awaySince: args.now }],
     pots: [{ id: MAIN_POT, amount: 0 }],
     nextSidePot: 1,
     seq: 0,
     undoable: null,
     lastActivity: args.now,
   };
-  return withSeat(commit(table, args.now, [buyInEntry(table, args.seatId, name.value)]), args.seatId);
+  return withSeat(commit(table, args.now, [buyInEntry(table, args.seatId, args.name)]), args.seatId);
 }
 
 /** A new name takes a new seat; the name of an away seat takes that seat over. */
 export function join(table: Table, args: NewSeat): SeatOutcome {
-  const name = parseSeatName(args.name);
-  if (!name.ok) return refuse(name.code);
-  const existing = table.seats.find((s) => sameName(s.name, name.value));
+  const existing = table.seats.find((s) => sameName(s.name, args.name));
   if (existing) {
     if (existing.awaySince === null) return refuse('name-taken');
     const claimed = replaceSeat(table, { ...existing, keyHash: args.keyHash });
@@ -116,7 +109,7 @@ export function join(table: Table, args: NewSeat): SeatOutcome {
     return withSeat(commit(claimed, args.now, [note]), existing.id);
   }
   if (table.seats.length >= MAX_SEATS) return refuse('table-full');
-  const seat: Seat = { id: args.seatId, name: name.value, stack: 0, keyHash: args.keyHash, awaySince: args.now };
+  const seat: Seat = { id: args.seatId, name: args.name, stack: 0, keyHash: args.keyHash, awaySince: args.now };
   const seated = { ...table, seats: [...table.seats, seat] };
   return withSeat(commit(seated, args.now, [buyInEntry(seated, seat.id, seat.name)]), seat.id);
 }
@@ -169,7 +162,7 @@ export function execute(table: Table, actor: SeatId, cmd: Command, now: number):
     case 'split': {
       const pot = potOf(table, cmd.pot);
       if (!pot) return refuse('no-such-pot');
-      const ids = Array.isArray(cmd.seats) ? cmd.seats : [];
+      const ids = cmd.seats;
       if (ids.length < 2 || ids.length > MAX_SEATS || new Set(ids).size !== ids.length) return refuse('bad-frame');
       const seats = ids.map((id) => seatOf(table, id));
       if (seats.some((s) => !s)) return refuse('no-such-seat');
@@ -183,7 +176,6 @@ export function execute(table: Table, actor: SeatId, cmd: Command, now: number):
       const target = seatOf(table, cmd.seat ?? actor);
       if (!target) return refuse('no-such-seat');
       if (target.id !== actor && !isHost) return refuse('not-host');
-      if (!['rebuy', 'cashout', 'correction'].includes(cmd.reason)) return refuse('bad-frame');
       const delta = parseDelta(cmd.delta);
       if (!delta.ok) return refuse(delta.code);
       if (target.stack + delta.value < 0) return refuse('short-stack');

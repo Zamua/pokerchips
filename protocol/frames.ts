@@ -1,7 +1,7 @@
 import type { ErrorCode } from '../domain/errors.js';
 import type { Entry } from '../domain/ledger.js';
 import type { Command, Table } from '../domain/table.js';
-import { LEDGER_TAIL, type SeatId, isPotId } from '../domain/values.js';
+import { type Chips, LEDGER_TAIL, type Parsed, type SeatId, type SeatName, isPotId, parseBuyIn, parseSeatName } from '../domain/values.js';
 
 export interface SeatView {
   id: SeatId;
@@ -81,7 +81,7 @@ export function opOf(text: string): string {
   }
 }
 
-/** Untrusted text to a frame, or null. Field values are checked again by the domain. */
+/** Untrusted text to a frame, or null. The domain still applies its rules to the values. */
 export function parseClientFrame(text: string): ClientFrame | null {
   let v: unknown;
   try {
@@ -143,4 +143,31 @@ function parseCommand(c: unknown): Command | null {
     default:
       return null;
   }
+}
+
+/** The body of `POST /api/tables`. */
+export interface OpenRequest {
+  name: SeatName;
+  buyIn: Chips;
+}
+
+/** The body of `POST /api/tables/<code>/seats`. */
+export interface JoinRequest {
+  name: SeatName;
+}
+
+/** Untrusted JSON to a join request, or why not. */
+export function parseJoinRequest(body: unknown): Parsed<JoinRequest> {
+  if (!isObject(body)) return { ok: false, code: 'bad-frame' };
+  const name = parseSeatName(body.name);
+  return name.ok ? { ok: true, value: { name: name.value } } : name;
+}
+
+/** Untrusted JSON to an open request, or why not; a missing buy-in takes the default. */
+export function parseOpenRequest(body: unknown): Parsed<OpenRequest> {
+  if (!isObject(body)) return { ok: false, code: 'bad-frame' };
+  const name = parseSeatName(body.name);
+  if (!name.ok) return name;
+  const buyIn = parseBuyIn(body.buyIn);
+  return buyIn.ok ? { ok: true, value: { name: name.value, buyIn: buyIn.value } } : buyIn;
 }

@@ -24,7 +24,7 @@ only point downward.
 | Layer | Directory | Holds | May import |
 | --- | --- | --- | --- |
 | Domain | `domain/` | The `Table` aggregate, value objects (`TableCode`, `SeatName`, `Chips`, `PotId`), ledger entries, the rules of every command, error codes. Pure functions over plain data. | nothing |
-| Protocol | `protocol/` | Frame and state types shared by the Worker and the client, and the parser that turns untrusted JSON into typed frames. | `domain/` |
+| Protocol | `protocol/` | Frame, state and request types shared by the Worker and the client, and the parsers that turn untrusted JSON into typed frames and request bodies. The Worker parses a request body before it reaches a cell; the cell parses its own internal body with the same parser; the service and domain take only parsed values. | `domain/` |
 | Application | `app/` | `TableService`: load the table, run a domain command, persist the entry, publish the new state. Ports it needs: `TableStore`, `Publisher`, `Clock`, `Random`. | `domain/`, `protocol/` |
 | Adapters | `worker/` | The Worker entry, `TableCell`, the SQLite `TableStore`, the hibernating-socket `Publisher`, rate limiting, the expiry alarm. | everything above |
 | Client | `client/` | The React app: screens, the drawer, the socket lifecycle, recent tables, the landing's chip toy. | `protocol/`, `domain/` (for formatting and client-side checks only) |

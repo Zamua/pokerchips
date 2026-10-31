@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { type LegacyRoom, cleanName, importLegacy, seatIdOf } from './legacy.js';
 import { arrive, execute, join } from './table.js';
+import { type Parsed, parseSeatName } from './values.js';
 
 const NOW = 2_000_000_000_000;
+const parsed = <T>(p: Parsed<T>): T => {
+  if (!p.ok) throw new Error(`refused: ${p.code}`);
+  return p.value;
+};
 const uuid = (n: number) => `${String(n).padStart(8, '0')}-aaaa-4bbb-8ccc-dddddddddddd`;
 
 /** A version 2 room in the shape its file store wrote. */
@@ -69,7 +74,7 @@ describe('importing a version 2 room', () => {
 
   it('lets a player claim their seat by name and play on', () => {
     let { table } = imported();
-    const claim = join(table, { name: 'ben', seatId: 'unused', keyHash: 'kb', now: NOW + 1 });
+    const claim = join(table, { name: parsed(parseSeatName('ben')), seatId: 'unused', keyHash: 'kb', now: NOW + 1 });
     if (!claim.ok) throw new Error(claim.code);
     expect(claim.seat).toBe(seatIdOf(uuid(2)));
     table = arrive(claim.table, claim.seat!, NOW + 1);
