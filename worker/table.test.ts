@@ -1,8 +1,8 @@
 import { SELF, env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { IDLE_LIFETIME_MS } from '../domain/values.js';
 import type { ServerFrame, TableView } from '../protocol/frames.js';
-import type { TableService } from '../app/tableService.js';
+import { tableService } from './TableCell.js';
 
 const BASE = 'https://pokerchips.test';
 
@@ -49,9 +49,13 @@ class Client {
 
   static async seated(code: string, seatKey: string): Promise<Client> {
     const c = await Client.connect(code);
-    c.send({ t: 'hello', seatKey });
-    await c.next((f) => f.t === 'welcome');
+    await c.hello(seatKey);
     return c;
+  }
+
+  async hello(seatKey: string) {
+    this.send({ t: 'hello', seatKey });
+    return this.next<Extract<ServerFrame, { t: 'welcome' }>>((f) => f.t === 'welcome');
   }
 
   send(frame: unknown) {
@@ -143,10 +147,9 @@ describe('a table over WebSockets', () => {
     ana.send({ t: 'cmd', op: 'same', cmd: { type: 'bet', pot: 'main', amount: 100 } });
     await ana.next((f) => (f.t === 'ack' || f.t === 'nack') && f.op === 'same', count);
     expect(ana.frames.filter((f) => f.t === 'ack' && f.op === 'same')).toEqual([first, first]);
-    const info = await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (_cell, state) =>
-      state.storage.sql.exec<{ n: number }>("SELECT count(*) AS n FROM ledger WHERE json LIKE '%\"bet\"%'").one().n,
-    );
-    expect(info).toBe(1);
+    const { state } = await (await Client.connect(t.code)).hello(t.seatKey);
+    expect(stackOf(state, 'Ana')).toBe(900);
+    expect(state.ledger.filter((e) => e.kind === 'bet')).toHaveLength(1);
   });
 
   it('gives a contested pot to exactly one collector', async () => {
@@ -228,17 +231,13 @@ describe('expiry', () => {
     const stub = env.TABLES.get(env.TABLES.idFromName(t.code));
     await runDurableObjectAlarm(stub);
     expect((await call(`/api/tables/${t.code}`)).status).toBe(200);
-    await runInDurableObject(stub, async (_cell, state) => {
-      const row = state.storage.sql.exec<{ json: string }>('SELECT json FROM state').one();
-      const table = JSON.parse(row.json);
-      table.lastActivity -= IDLE_LIFETIME_MS + 1;
-      state.storage.sql.exec('UPDATE state SET json = ?', JSON.stringify(table));
-    });
-    // The cell caches the table; a fresh instance reads the aged row.
-    await runInDurableObject(stub, async (cell) => {
-      (cell as unknown as { service: { store: { cached?: unknown } } }).service.store.cached = undefined;
-    });
-    await runDurableObjectAlarm(stub);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + IDLE_LIFETIME_MS + 1);
+      await runDurableObjectAlarm(stub);
+    } finally {
+      vi.useRealTimers();
+    }
     expect((await call(`/api/tables/${t.code}`)).status).toBe(404);
   });
 });
@@ -278,26 +277,22 @@ describe('moving a version 2 room in', () => {
 });
 
 describe('storage cost', () => {
-  type Cell = {
-    service: Pick<TableService, 'command' | 'view'> & { store: { storage: DurableObjectStorage } };
-  };
-
-  /** SQLite rows the cell's store reads while `body` runs. */
-  function rowsRead(cell: Cell, body: () => void): number {
-    const store = cell.service.store;
-    const real = store.storage;
+  /** Storage that tallies the SQLite rows read through it while `body` runs. */
+  function counting(real: DurableObjectStorage) {
     const cursors: SqlStorageCursor<Record<string, SqlStorageValue>>[] = [];
-    store.storage = {
+    const storage = {
       sql: { exec: (query: string, ...args: unknown[]) => cursors[cursors.push(real.sql.exec(query, ...args)) - 1] },
       transactionSync: <T>(fn: () => T) => real.transactionSync(fn),
     } as unknown as DurableObjectStorage;
-    try {
+    const rowsRead = (body: () => void) => {
+      const from = cursors.length;
       body();
-    } finally {
-      store.storage = real;
-    }
-    return cursors.reduce((sum, c) => sum + c.rowsRead, 0);
+      return cursors.slice(from).reduce((sum, c) => sum + c.rowsRead, 0);
+    };
+    return { storage, rowsRead };
   }
+
+  const quiet = { broadcast: () => {} };
 
   const storedTail = (storage: DurableObjectStorage) =>
     storage.sql
@@ -309,15 +304,17 @@ describe('storage cost', () => {
   it('reads a handful of rows per command, however long the ledger and however many answers a seat holds', async () => {
     const t = await openTable('Ana', 1_000_000);
     const b = await joinTable(t.code, 'Ben');
-    const reads = await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (instance, state) => {
-      const cell = instance as unknown as Cell;
-      const bet = (i: number, op: string) => cell.service.command(i % 2 ? t.seatId : b.seatId, op, { type: 'bet', pot: 'main', amount: 1 });
-      const tenBets = (tag: string) => Array.from({ length: 10 }, (_, i) => rowsRead(cell, () => bet(i, `${tag}${i}`)));
+    const reads = await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (_cell, state) => {
+      const { storage, rowsRead } = counting(state.storage);
+      const service = tableService(storage, quiet);
+      service.view(); // a running cell holds the table and its ledger tail in memory
+      const bet = (i: number, op: string) => service.command(i % 2 ? t.seatId : b.seatId, op, { type: 'bet', pot: 'main', amount: 1 });
+      const tenBets = (tag: string) => Array.from({ length: 10 }, (_, i) => rowsRead(() => bet(i, `${tag}${i}`)));
       const early = tenBets('early');
       for (let i = 0; i < 300; i++) bet(i, `warm${i}`);
       const late = tenBets('late');
-      const repeated = rowsRead(cell, () => bet(9, 'late9'));
-      expect(cell.service.view()!.ledger).toEqual(storedTail(state.storage));
+      const repeated = rowsRead(() => bet(9, 'late9'));
+      expect(service.view()!.ledger).toEqual(storedTail(state.storage));
       return { early, late, repeated };
     });
     expect(Math.max(...reads.early)).toBeLessThanOrEqual(5);
@@ -327,17 +324,17 @@ describe('storage cost', () => {
 
   it('never shows an entry whose write rolled back', async () => {
     const t = await openTable();
-    await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (instance, state) => {
-      const cell = instance as unknown as Cell;
-      const bet = (op: string) => cell.service.command(t.seatId, op, { type: 'bet', pot: 'main', amount: 1 });
+    await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), async (_cell, state) => {
+      const service = tableService(state.storage, quiet);
+      const bet = (op: string) => service.command(t.seatId, op, { type: 'bet', pot: 'main', amount: 1 });
       bet('a');
-      const next = cell.service.view()!.seq + 1;
+      const next = service.view()!.seq + 1;
       state.storage.sql.exec('INSERT INTO ledger (seq, json) VALUES (?, ?)', next, '{}');
       expect(() => bet('b')).toThrow();
       state.storage.sql.exec('DELETE FROM ledger WHERE seq = ?', next);
-      expect(cell.service.view()!.ledger).toEqual(storedTail(state.storage));
+      expect(service.view()!.ledger).toEqual(storedTail(state.storage));
       expect(bet('c')).toEqual({ t: 'ack', op: 'c', seq: next });
-      expect(cell.service.view()!.ledger).toEqual(storedTail(state.storage));
+      expect(service.view()!.ledger).toEqual(storedTail(state.storage));
     });
   });
 });
