@@ -27,6 +27,8 @@ export class TableCell extends DurableObject<Env> {
     const publisher: Publisher = { broadcast: (frame) => this.broadcast(frame) };
     this.service = tableService(ctx.storage, publisher);
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
+    // Sockets lost with an earlier instance never sent a close.
+    this.service.settle(this.connected());
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -141,15 +143,18 @@ export class TableCell extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  /** A seat departs when its last socket goes. */
   private left(ws: WebSocket): void {
-    const seat = (ws.deserializeAttachment() as Attachment | null)?.seat;
-    if (!seat) return;
-    const others = this.ctx
-      .getWebSockets()
-      .filter((s) => s !== ws && s.readyState === WebSocket.OPEN)
-      .some((s) => (s.deserializeAttachment() as Attachment | null)?.seat === seat);
-    if (!others) this.service.departed(seat);
+    this.service.settle(this.connected(ws));
+  }
+
+  /** The seats held by an open socket other than `gone`. */
+  private connected(gone?: WebSocket): Set<string> {
+    const seats = new Set<string>();
+    for (const s of this.ctx.getWebSockets()) {
+      const seat = s !== gone && s.readyState === WebSocket.OPEN ? (s.deserializeAttachment() as Attachment | null)?.seat : null;
+      if (seat) seats.add(seat);
+    }
+    return seats;
   }
 
   private broadcast(frame: ServerFrame): void {

@@ -98,7 +98,7 @@ add a `note` entry; presence is not in the ledger.
   This keeps "I switched phones" working with nothing but the code. Joining
   with the name of a seat that is here is refused (`name-taken`).
 - **Here and away.** A seat is here while at least one connection holds its
-  key, and away from the moment its last connection closes. The state shows
+  key, and away from the moment its last connection closes or is lost. The state shows
   `awaySince` for an away seat and `null` for one that is here; clients read
   presence from it. `here` repeats it for clients on an older build. The table's code is the credential: anyone
   with it can join, as in version 2.

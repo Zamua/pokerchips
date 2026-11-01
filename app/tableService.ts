@@ -1,7 +1,7 @@
 import type { ErrorCode } from '../domain/errors.js';
 import { type LegacyRoom, importLegacy } from '../domain/legacy.js';
 import type { Entry } from '../domain/ledger.js';
-import { type Command, type SeatOutcome, type Table, arrive, depart, execute, join, openTable, seatByKeyHash } from '../domain/table.js';
+import { type Command, type SeatOutcome, type Table, arrive, execute, join, openTable, seatByKeyHash, settle } from '../domain/table.js';
 import { IDLE_LIFETIME_MS, LEDGER_TAIL, type SeatId, type TableCode } from '../domain/values.js';
 import { type JoinRequest, type OpenRequest, type TableView, viewOf } from '../protocol/frames.js';
 import type { Answer, Clock, Publisher, Secrets, TableStore } from './ports.js';
@@ -74,11 +74,11 @@ export class TableService {
     return this.view(next);
   }
 
-  /** The seat's last socket closed. */
-  departed(seat: SeatId): void {
+  /** The seats that hold an open socket now; every other seat is away. */
+  settle(connected: ReadonlySet<SeatId>): void {
     const table = this.store.load();
     if (!table) return;
-    const next = depart(table, seat, this.clock.now());
+    const next = settle(table, connected, this.clock.now());
     if (next === table) return;
     this.store.save(next, []);
     this.publish();
