@@ -5,7 +5,7 @@ import type { Command } from '../../../domain/table.js';
 import { MAIN_POT, MAX_SEATS } from '../../../domain/values.js';
 import { type SeatView, type TableView, isHere } from '../../../protocol/frames.js';
 import { api } from '../net/api.js';
-import type { Status } from '../net/tableSocket.js';
+import type { Status } from '../net/link.js';
 import { useTable } from '../net/useTable.js';
 import { recent } from '../store/recent.js';
 import { AdjustDrawer, type Reason } from '../table/AdjustDrawer.js';
