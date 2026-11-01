@@ -181,7 +181,8 @@ Stable codes, each shown to the player as a sentence by the client:
   welcomed within 15 seconds as dropped, reconnects with
   exponential backoff (500 ms doubling to 30 s, 50 to 100% jitter), reconnects
   at once when the app returns to the foreground, and holds commands made
-  while disconnected (up to 100) to send after the next `welcome`. A
+  while disconnected (up to 100) to send after the next `welcome`; once the
+  seat is denied or the table left, a command is refused at once. A
   connection indicator shows connected, reconnecting, or offline.
 - **Screens.** Landing (open a table, join with a code, recent tables),
   open-a-table (name, buy-in presets 500, 1,000, 2,000, 5,000, 10,000 or a

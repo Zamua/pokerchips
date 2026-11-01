@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableView } from '../../../protocol/frames.js';
-import { BACKOFF_CAP_MS, HEARTBEAT_MS, MAX_ATTEMPTS, SILENCE_MS, type SocketLike, type Status, TableSocket, WELCOME_MS } from './tableSocket.js';
+import { BACKOFF_CAP_MS, HEARTBEAT_MS, MAX_ATTEMPTS, SILENCE_MS, type Status, WELCOME_MS } from './link.js';
+import { type SocketLike, TableSocket } from './tableSocket.js';
 
 class FakeSocket implements SocketLike {
   readyState = 0;
@@ -167,6 +168,18 @@ describe('TableSocket', () => {
     await expect(answer).resolves.toEqual({ ok: false, code: 'not-found' });
     vi.advanceTimersByTime(60_000);
     expect(h.sockets).toHaveLength(1);
+  });
+
+  it('settles at once a command made after it stopped or was denied', async () => {
+    const stopped = harness();
+    stopped.ts.start();
+    stopped.ts.stop();
+    await expect(stopped.ts.command({ type: 'openPot' })).resolves.toEqual({ ok: false, code: 'not-found' });
+    const denied = harness();
+    denied.ts.start();
+    denied.last().open();
+    denied.last().receive({ t: 'denied', code: 'not-found' });
+    await expect(denied.ts.command({ type: 'openPot' })).resolves.toEqual({ ok: false, code: 'not-found' });
   });
 
   it('asks for older ledger entries and hands back the answer', async () => {

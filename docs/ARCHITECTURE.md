@@ -68,6 +68,12 @@ and the chips flying between them).
   again an hour later. `TableService` decides when; the cell only sets the
   alarm. The Worker and the cell share their internal routes and refusal
   statuses from `worker/http.ts`.
+- **The client's connection.** `client/src/net/link.ts` names the
+  connection's states (idle, opening, hello, online, waiting, offline,
+  denied, stopped) and is the one place they change: a pure
+  `next(link, event, at)` returns the next state and the effects to perform.
+  `TableSocket` is the shell: it feeds socket, timer and page events in,
+  performs the effects, and holds the commands waiting for an answer.
 
 ## Moving from version 2
 
@@ -82,7 +88,8 @@ in a table that does not exist yet.
 - `app/` and `worker/`: integration tests against a real Durable Object and
   real WebSockets under `@cloudflare/vitest-plugin`: two clients, races
   on one pot, repeated `op` ids, reconnects, expiry.
-- `client/`: unit tests for the socket lifecycle, the state reducer and the
+- `client/`: event-sequence tests for the connection's states, unit tests for
+  the socket shell, the state reducer and the
   chip toy's rules, and a Playwright suite that drives two players through a
   hand, and the chip toy, on phone-sized Chromium and WebKit.
 

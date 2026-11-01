@@ -4,7 +4,8 @@ import type { Command } from '../../../domain/table.js';
 import type { TableView } from '../../../protocol/frames.js';
 import { recent } from '../store/recent.js';
 import { api } from './api.js';
-import { type Answer, type Status, TableSocket } from './tableSocket.js';
+import type { Status } from './link.js';
+import { type Answer, TableSocket } from './tableSocket.js';
 
 export interface TableConnection {
   state: TableView | null;
