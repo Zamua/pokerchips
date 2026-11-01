@@ -9,6 +9,8 @@ export type Answer = { ok: true; seq: number } | { ok: false; code: ErrorCode };
 export const HEARTBEAT_MS = 25_000;
 /** A socket that has heard nothing for this long is presumed dead. */
 export const SILENCE_MS = 2 * HEARTBEAT_MS + 5_000;
+/** A socket not welcomed this long after it was created counts as dropped. */
+export const WELCOME_MS = 15_000;
 export const BACKOFF_START_MS = 500;
 export const BACKOFF_CAP_MS = 30_000;
 export const MAX_ATTEMPTS = 15;
@@ -58,6 +60,7 @@ export class TableSocket {
   private seatId = '';
   private heartbeat: ReturnType<typeof setInterval> | undefined;
   private retry: ReturnType<typeof setTimeout> | undefined;
+  private deadline: ReturnType<typeof setTimeout> | undefined;
   private lastHeard = 0;
   private historyWait: { promise: Promise<Entry[] | null>; resolve(entries: Entry[] | null): void } | null = null;
 
@@ -71,6 +74,7 @@ export class TableSocket {
   stop(): void {
     this.stopped = true;
     clearTimeout(this.retry);
+    clearTimeout(this.deadline);
     clearInterval(this.heartbeat);
     this.ws?.close(1000, 'leave');
     this.ws = null;
@@ -137,6 +141,12 @@ export class TableSocket {
     ws.onmessage = (ev) => this.receive(ws, ev.data);
     ws.onclose = () => this.dropped(ws);
     ws.onerror = () => this.dropped(ws);
+    clearTimeout(this.deadline);
+    this.deadline = setTimeout(() => {
+      if (ws !== this.ws) return;
+      ws.close(4000, 'no welcome');
+      this.dropped(ws);
+    }, WELCOME_MS);
   }
 
   private receive(ws: SocketLike, data: unknown): void {
@@ -152,6 +162,7 @@ export class TableSocket {
       case 'welcome':
         this.welcomed = true;
         this.attempts = 0;
+        clearTimeout(this.deadline);
         this.seatId = frame.seatId;
         this.setStatus('online');
         this.startHeartbeat();
@@ -204,6 +215,7 @@ export class TableSocket {
     if (ws !== this.ws || this.stopped) return;
     this.ws = null;
     this.welcomed = false;
+    clearTimeout(this.deadline);
     clearInterval(this.heartbeat);
     this.endHistory(null);
     if (this.attempts >= MAX_ATTEMPTS) {

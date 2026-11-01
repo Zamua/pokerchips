@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableView } from '../../../protocol/frames.js';
-import { BACKOFF_CAP_MS, HEARTBEAT_MS, MAX_ATTEMPTS, SILENCE_MS, type SocketLike, type Status, TableSocket } from './tableSocket.js';
+import { BACKOFF_CAP_MS, HEARTBEAT_MS, MAX_ATTEMPTS, SILENCE_MS, type SocketLike, type Status, TableSocket, WELCOME_MS } from './tableSocket.js';
 
 class FakeSocket implements SocketLike {
   readyState = 0;
@@ -127,6 +127,23 @@ describe('TableSocket', () => {
     vi.advanceTimersByTime(SILENCE_MS);
     expect(h.sockets.length).toBe(before + 1);
     expect(h.sockets[before - 1].closed).toBe(true);
+  });
+
+  it('drops a socket that is not welcomed in time, whether or not it opened', () => {
+    const h = harness();
+    h.ts.start();
+    vi.advanceTimersByTime(WELCOME_MS);
+    expect(h.sockets[0].closed).toBe(true);
+    expect(h.statuses).toEqual(['reconnecting']);
+    vi.advanceTimersByTime(500);
+    h.last().open();
+    vi.advanceTimersByTime(WELCOME_MS);
+    expect(h.sockets[1].closed).toBe(true);
+    vi.advanceTimersByTime(1000);
+    h.welcome();
+    vi.advanceTimersByTime(WELCOME_MS);
+    expect(h.last().closed).toBe(false);
+    expect(h.statuses.at(-1)).toBe('online');
   });
 
   it('reconnects at once when the page returns, and not when the link is healthy', () => {
