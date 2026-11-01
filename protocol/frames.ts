@@ -7,8 +7,6 @@ export interface SeatView {
   id: SeatId;
   name: string;
   stack: number;
-  /** The same as isHere(seat); still sent for clients on an older build. */
-  here: boolean;
   /** null while a connection holds the seat. */
   awaySince: number | null;
 }
@@ -58,7 +56,6 @@ export function viewOf(table: Table, ledgerTail: Entry[]): TableView {
       id: s.id,
       name: s.name,
       stack: s.stack,
-      here: isHere(s),
       awaySince: s.awaySince,
     })),
     pots: table.pots.map((p) => ({ id: p.id, amount: p.amount })),

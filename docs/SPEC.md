@@ -100,8 +100,8 @@ add a `note` entry; presence is not in the ledger.
 - **Here and away.** A seat is here while at least one connection holds its
   key, and away from the moment its last connection closes or is lost. The state shows
   `awaySince` for an away seat and `null` for one that is here; clients read
-  presence from it. `here` repeats it for clients on an older build. The table's code is the credential: anyone
-  with it can join, as in version 2.
+  presence from it. The table's code is the credential: anyone with it can
+  join, as in version 2.
 - A client keeps each table's seat key on the device, so reopening the table
   goes straight back to the seat.
 
@@ -150,7 +150,7 @@ Table to client:
 {
   code, createdAt, buyIn, seq,          // seq: the last ledger entry
   host: <seatId>,
-  seats:  [{ id, name, stack, here, awaySince }],
+  seats:  [{ id, name, stack, awaySince }],
   pots:   [{ id, amount }],
   ledger: [<the newest 50 entries>],
   undoable: <seq> | null
