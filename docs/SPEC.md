@@ -177,7 +177,8 @@ Stable codes, each shown to the player as a sentence by the client:
 
 ## Client
 
-- **Connection.** The client pings every 25 seconds, reconnects with
+- **Connection.** The client pings every 25 seconds, counts a socket not
+  welcomed within 15 seconds as dropped, reconnects with
   exponential backoff (500 ms doubling to 30 s, 50 to 100% jitter), reconnects
   at once when the app returns to the foreground, and holds commands made
   while disconnected (up to 100) to send after the next `welcome`. A
