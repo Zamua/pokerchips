@@ -138,6 +138,11 @@ export function depart(table: Table, seatId: SeatId, now: number): Table {
   return { ...replaceSeat(table, { ...seat, awaySince: now }), lastActivity: now };
 }
 
+/** Presence follows the open connections: every seat marked here that holds none departs. */
+export function settle(table: Table, connected: ReadonlySet<SeatId>, now: number): Table {
+  return table.seats.reduce((t, s) => (connected.has(s.id) ? t : depart(t, s.id, now)), table);
+}
+
 export function execute(table: Table, actor: SeatId, cmd: Command, now: number): Outcome {
   const me = seatOf(table, actor);
   if (!me) return refuse('no-such-seat');

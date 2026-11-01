@@ -192,6 +192,21 @@ describe('a table over WebSockets', () => {
     expect(s.seats.find((x) => x.name === 'Ben')!.awaySince).toEqual(expect.any(Number));
   });
 
+  it('counts a seat away whose socket was lost with its instance, so its name can be claimed', async () => {
+    const t = await openTable();
+    const b = await joinTable(t.code, 'Ben');
+    const ben = await Client.seated(t.code, b.seatKey);
+    const closed = new Promise<void>((resolve) => ben.ws.addEventListener('close', () => resolve()));
+    const stub = env.TABLES.get(env.TABLES.idFromName(t.code));
+    await runInDurableObject(stub, (_cell, state) => state.abort('restart')).catch(() => {});
+    await closed;
+    expect((await call(`/api/tables/${t.code}`)).body.seats).toEqual([
+      { name: 'Ana', here: false },
+      { name: 'Ben', here: false },
+    ]);
+    expect((await joinTable(t.code, 'Ben')).seatId).toBe(b.seatId);
+  });
+
   it('refuses commands before hello, junk frames, and floods', async () => {
     const t = await openTable();
     const c = await Client.connect(t.code);

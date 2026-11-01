@@ -60,7 +60,9 @@ and the chips flying between them).
   woken from hibernation reads them once.
 - **Sockets.** The WebSocket Hibernation API: a socket's attachment records
   its seat once `hello` succeeds, so presence is "any open socket holding
-  this seat". `ping` is an auto-response and never wakes the table.
+  this seat". The cell settles presence on its open sockets when a socket
+  closes and when it starts, since sockets lost with an earlier instance
+  send no close. `ping` is an auto-response and never wakes the table.
 - **Expiry.** An alarm set 30 days after the last activity deletes the
   table's storage when it fires and no socket is open; otherwise it checks
   again an hour later. `TableService` decides when; the cell only sets the

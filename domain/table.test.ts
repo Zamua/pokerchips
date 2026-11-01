@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Command, type Outcome, type SeatOutcome, type Table, arrive, depart, execute, hostClaimable, join, openTable } from './table.js';
+import { type Command, type Outcome, type SeatOutcome, type Table, arrive, depart, execute, hostClaimable, join, openTable, settle } from './table.js';
 import { BUY_IN_DEFAULT, HOST_CLAIM_AFTER_MS, MAX_SEATS, MAX_SIDE_POTS, type Parsed, parseSeatName, parseTableCode } from './values.js';
 
 const T0 = 1_000_000;
@@ -214,6 +214,18 @@ it('records presence without a ledger entry', () => {
   expect(t.seats.find((s) => s.id === 'cara')!.awaySince).toBe(T0 + 5);
   expect(t.seq).toBe(table().seq);
   expect(arrive(t, 'cara', T0 + 6).seats.find((s) => s.id === 'cara')!.awaySince).toBeNull();
+});
+
+it('settles presence on the open connections: a seat without one goes away once, the rest stay', () => {
+  const t = settle(table(), new Set(['ana']), T0 + 5);
+  expect(t.seats.map((s) => [s.id, s.awaySince])).toEqual([
+    ['ana', null],
+    ['ben', T0 + 5],
+    ['cara', T0 + 5],
+  ]);
+  expect(t.lastActivity).toBe(T0 + 5);
+  expect(settle(t, new Set(['ana']), T0 + 9)).toBe(t);
+  expect(settle(table(), new Set(['ana', 'ben', 'cara']), T0 + 5)).toEqual(table());
 });
 
 it('numbers entries in order and never lets a stack or pot go negative', () => {
