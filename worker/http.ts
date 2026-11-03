@@ -13,6 +13,9 @@ export const CELL_ROUTES = {
 
 export const cellUrl = (route: keyof typeof CELL_ROUTES) => `https://table${CELL_ROUTES[route]}`;
 
+/** Set on a cell's reply to a socket for a table that does not exist, which is otherwise a 101. */
+export const MISSING = 'X-Table-Missing';
+
 /** The status a cell answers each refusal with; 'exists' tells the Worker to open under another code. */
 export const STATUS: Partial<Record<ErrorCode | 'exists', number>> = {
   'not-found': 404,

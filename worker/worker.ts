@@ -1,10 +1,10 @@
 import { parseTableCode } from '../domain/values.js';
 import { parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
 import type { Env } from './env.js';
-import { STATUS, cellUrl, json } from './http.js';
+import { MISSING, STATUS, cellUrl, json } from './http.js';
 import { MAX_BODY } from './limits.js';
 import { tableCode } from './secrets.js';
-import { sourceOf } from './source.js';
+import { type SourceLimits, sourceLimits } from './sourceLimits.js';
 
 export { CreationLimiter } from './CreationLimiter.js';
 export { TableCell } from './TableCell.js';
@@ -29,7 +29,7 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
     if (request.method !== 'POST') return json({ error: 'bad-frame' }, 405);
     const req = parseOpenRequest(await readJson(request));
     if (!req.ok) return json({ error: req.code }, 400);
-    if (!(await mayOpen(request, env))) return json({ error: 'rate-limited' }, 429);
+    if (!(await sourceLimits(env, request).mayOpen())) return json({ error: 'rate-limited' }, 429);
     for (let i = 0; i < OPEN_ATTEMPTS; i++) {
       const code = tableCode();
       const res = await table(env, code).fetch(cellUrl('open'), {
@@ -44,30 +44,32 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
   const code = parseTableCode(parts[2]);
   if (!code.ok) return json({ error: code.code }, 400);
   const stub = table(env, code.value);
+  const limits = sourceLimits(env, request);
   switch (`${request.method} ${parts[3] ?? ''}`) {
     case 'GET ':
-      return stub.fetch(cellUrl('info'));
+      return reachCell(limits, () => stub.fetch(cellUrl('info')));
     case 'POST seats': {
       const req = parseJoinRequest(await readJson(request));
       if (!req.ok) return json({ error: req.code }, 400);
-      return stub.fetch(cellUrl('seats'), { method: 'POST', body: JSON.stringify(req.value) });
+      return reachCell(limits, () => stub.fetch(cellUrl('seats'), { method: 'POST', body: JSON.stringify(req.value) }));
     }
     case 'GET socket':
-      return stub.fetch(new Request(cellUrl('socket'), request));
+      return reachCell(limits, () => stub.fetch(new Request(cellUrl('socket'), request)));
     default:
       return json({ error: 'not-found' }, 404);
   }
 }
 
-function table(env: Env, code: string) {
-  return env.TABLES.get(env.TABLES.idFromName(code), { locationHint: 'enam' });
+/** Calls a table's cell unless the source has looked up too many tables that do not exist; a lookup that finds none counts against it. */
+async function reachCell(limits: SourceLimits, call: () => Promise<Response>): Promise<Response> {
+  if (!(await limits.mayLookUp())) return json({ error: 'rate-limited' }, 429);
+  const res = await call();
+  if (res.status === 404 || res.headers.has(MISSING)) await limits.missed();
+  return res;
 }
 
-/** Whether the request's network may open another table; a request with no address is not counted. */
-async function mayOpen(request: Request, env: Env): Promise<boolean> {
-  const source = sourceOf(request.headers.get('CF-Connecting-IP'));
-  if (source === null) return true;
-  return env.CREATIONS.get(env.CREATIONS.idFromName('creations'), { locationHint: 'enam' }).take(source);
+function table(env: Env, code: string) {
+  return env.TABLES.get(env.TABLES.idFromName(code), { locationHint: 'enam' });
 }
 
 /** A browser's request must come from this Worker's origin or a listed one. */
