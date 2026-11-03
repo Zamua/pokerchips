@@ -1,7 +1,8 @@
 import { SELF, env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
-import { IDLE_LIFETIME_MS } from '../domain/values.js';
+import { IDLE_LIFETIME_MS, MAX_SEATS } from '../domain/values.js';
 import type { ServerFrame, TableView } from '../protocol/frames.js';
+import { CREATIONS_PER_WINDOW, CREATION_WINDOW_MS, MAX_FRAME, MAX_SOCKETS } from './limits.js';
 import { tableService } from './TableCell.js';
 
 const BASE = 'https://pokerchips.test';
@@ -237,6 +238,97 @@ describe('a table over WebSockets', () => {
     const c = await Client.connect(t.code);
     c.send({ t: 'ping' });
     await c.next((f) => f.t === 'pong');
+  });
+});
+
+describe('abuse limits', () => {
+  const closing = (c: Client) => new Promise<CloseEvent>((resolve) => c.ws.addEventListener('close', resolve));
+  const hostFrom = (ip: string) => ({ 'CF-Connecting-IP': ip });
+  const openFrom = (ip: string) => call('/api/tables', { name: 'Ana', buyIn: 1000 }, hostFrom(ip));
+
+  it('keeps the largest real frame under the frame cap', () => {
+    const op = 'a'.repeat(64);
+    const seats = Array.from({ length: MAX_SEATS }, () => 'f'.repeat(16));
+    const widest = JSON.stringify({ t: 'cmd', op, cmd: { type: 'split', pot: 'side-8', seats } });
+    expect(widest.length).toBeLessThan(MAX_FRAME / 4);
+  });
+
+  it('answers a frame past the cap with a nack and closes the socket, parsing nothing', async () => {
+    const t = await openTable();
+    const c = await Client.seated(t.code, t.seatKey);
+    const closed = closing(c);
+    c.send(JSON.stringify({ t: 'cmd', op: 'big', cmd: { type: 'openPot' }, pad: 'x'.repeat(MAX_FRAME) }));
+    expect(await c.next((f) => f.t === 'nack')).toEqual({ t: 'nack', op: '', code: 'bad-frame' });
+    expect((await closed).code).toBe(1009);
+  });
+
+  it('closes on a binary frame past the cap too', async () => {
+    const t = await openTable();
+    const c = await Client.connect(t.code);
+    const closed = closing(c);
+    c.ws.send(new Uint8Array(MAX_FRAME + 1));
+    expect((await closed).code).toBe(1009);
+  });
+
+  it('serves a frame at the cap', async () => {
+    const t = await openTable();
+    const c = await Client.seated(t.code, t.seatKey);
+    const frame = JSON.stringify({ t: 'history', before: 1 });
+    c.send(frame + ' '.repeat(MAX_FRAME - frame.length));
+    await c.next((f) => f.t === 'history');
+  });
+
+  it('refuses a socket past the per-table cap, and serves one again once one closes', async () => {
+    const t = await openTable();
+    const held: Client[] = [];
+    for (let i = 0; i < MAX_SOCKETS; i++) held.push(await Client.connect(t.code));
+    const refused = await SELF.fetch(`${BASE}/api/tables/${t.code}/socket`, { headers: { Upgrade: 'websocket' } });
+    expect(refused.status).toBe(503);
+    held[0]!.ws.close(1000, 'bye');
+    await vi.waitFor(async () => {
+      const res = await SELF.fetch(`${BASE}/api/tables/${t.code}/socket`, { headers: { Upgrade: 'websocket' } });
+      expect(res.status).toBe(101);
+    });
+  });
+
+  it('caps table creations per source network, not globally', async () => {
+    for (let i = 0; i < CREATIONS_PER_WINDOW; i++) expect((await openFrom(`198.51.100.${i}`)).status).toBe(201);
+    const over = await openFrom('198.51.100.200');
+    expect(over.status).toBe(429);
+    expect(over.body).toEqual({ error: 'rate-limited' });
+    expect((await openFrom('198.51.101.1')).status).toBe(201);
+    expect((await openFrom('2001:db8:aaaa:1::1')).status).toBe(201);
+    expect((await call('/api/tables', { name: 'Ana', buyIn: 1000 })).status).toBe(201);
+  });
+
+  it('counts an IPv6 network by its /64', async () => {
+    for (let i = 0; i < CREATIONS_PER_WINDOW; i++) expect((await openFrom(`2001:db8:bbbb:1::${i + 1}`)).status).toBe(201);
+    expect((await openFrom('2001:db8:bbbb:1:ffff::9')).status).toBe(429);
+    expect((await openFrom('2001:db8:bbbb:2::1')).status).toBe(201);
+  });
+
+  it('does not count a refused request against the cap', async () => {
+    for (let i = 0; i < CREATIONS_PER_WINDOW + 5; i++) {
+      expect((await call('/api/tables', { name: '', buyIn: 1000 }, hostFrom('198.51.102.1'))).status).toBe(400);
+    }
+    expect((await openFrom('198.51.102.1')).status).toBe(201);
+  });
+
+  it('forgets a source when its window ends, and keeps no address while it lasts', async () => {
+    const stub = env.CREATIONS.get(env.CREATIONS.idFromName('creations'));
+    for (let i = 0; i < CREATIONS_PER_WINDOW; i++) await openFrom('198.51.103.1');
+    expect((await openFrom('198.51.103.1')).status).toBe(429);
+    const stored = await runInDurableObject(stub, (_i, state) => JSON.stringify([...state.storage.kv.list()]));
+    expect(stored).not.toContain('198.51.103');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + CREATION_WINDOW_MS + 1);
+      await runDurableObjectAlarm(stub);
+      expect(await runInDurableObject(stub, (_i, state) => [...state.storage.kv.list()])).toEqual([]);
+      expect((await openFrom('198.51.103.1')).status).toBe(201);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

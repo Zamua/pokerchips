@@ -5,6 +5,7 @@ import { parseTableCode } from '../domain/values.js';
 import { PING, PONG, type ServerFrame, opOf, parseClientFrame, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
 import type { Env } from './env.js';
 import { CELL_ROUTES, STATUS, json } from './http.js';
+import { MAX_FRAME, MAX_SOCKETS } from './limits.js';
 import { RateLimit } from './rateLimit.js';
 import { secrets } from './secrets.js';
 import { SqlTableStore } from './sqlStore.js';
@@ -70,6 +71,11 @@ export class TableCell extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if ((typeof message === 'string' ? message.length : message.byteLength) > MAX_FRAME) {
+      send(ws, { t: 'nack', op: '', code: 'bad-frame' });
+      ws.close(1009, 'too-big');
+      return;
+    }
     const text = typeof message === 'string' ? message : '';
     if (!this.limit.allow(ws, Date.now())) {
       send(ws, { t: 'nack', op: opOf(text), code: 'rate-limited' });
@@ -130,6 +136,7 @@ export class TableCell extends DurableObject<Env> {
 
   private accept(request: Request): Response {
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return json({ error: 'bad-frame' }, 426);
+    if (this.ctx.getWebSockets().length >= MAX_SOCKETS) return json({ error: 'table-full' }, 503);
     const [client, server] = Object.values(new WebSocketPair());
     if (!this.service.info()) {
       // A browser reads a refused upgrade as a network failure; a closing socket says why.

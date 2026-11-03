@@ -111,15 +111,21 @@ add a `note` entry; presence is not in the ledger.
 
 | Request | Answer |
 | --- | --- |
-| `POST /api/tables` `{ name, buyIn? }` | 201 `{ code, seatId, seatKey }` |
+| `POST /api/tables` `{ name, buyIn? }` | 201 `{ code, seatId, seatKey }`; 429 `rate-limited` |
 | `GET /api/tables/<code>` | 200 `{ code, seats: [{ name, here }] }`, or 404 |
 | `POST /api/tables/<code>/seats` `{ name }` | 201 `{ seatId, seatKey }`; 404; 409 `name-taken` or `table-full` |
-| `GET /api/tables/<code>/socket` (WebSocket upgrade) | 101; for a table that does not exist the socket answers `denied` with `not-found` and closes |
+| `GET /api/tables/<code>/socket` (WebSocket upgrade) | 101; for a table that does not exist the socket answers `denied` with `not-found` and closes; 503 `table-full` while the table holds 64 sockets |
 | `GET /healthz` | 200 `ok` |
 
 A request whose `Origin` is not on the allowed list is refused with 403.
 Everything else is the client app; any other path serves it, so
 `pokerchips.app/<code>` opens that table.
+
+A request body may be at most 4 KiB. One network, an IPv4 /24 or an IPv6
+/64, may open 30 tables an hour; further requests are answered 429. The
+count is kept under a hash of a random salt and the network, and the salt,
+the hashes and the counts are erased when the hour ends. No address is
+stored or logged, and a request with no address is not counted.
 
 ### WebSocket
 
@@ -164,7 +170,9 @@ table writes itself, such as an import, has `by: null`. Clients render its
 text.
 
 A socket may send at most 10 frames a second; extra frames are answered
-`nack` with `rate-limited` and dropped. A refused frame's `nack` carries its
+`nack` with `rate-limited` and dropped. A frame over 4 KiB is answered `nack`
+with `bad-frame` and `op` `""`, unread, and the socket is closed with code
+1009. A refused frame's `nack` carries its
 `op` whenever the frame is JSON with a valid `op`, and `""` otherwise.
 
 ### Errors
