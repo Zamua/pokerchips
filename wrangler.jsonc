@@ -4,9 +4,15 @@
   "main": "worker/worker.ts",
   "compatibility_date": "2026-09-01",
   "durable_objects": {
-    "bindings": [{ "name": "TABLES", "class_name": "TableCell" }]
+    "bindings": [
+      { "name": "TABLES", "class_name": "TableCell" },
+      { "name": "CREATIONS", "class_name": "CreationLimiter" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TableCell"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TableCell"] },
+    { "tag": "v2", "new_sqlite_classes": ["CreationLimiter"] }
+  ],
   "assets": {
     "directory": "client/dist",
     "binding": "ASSETS",

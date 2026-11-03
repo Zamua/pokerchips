@@ -2,11 +2,13 @@ import { parseTableCode } from '../domain/values.js';
 import { parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
 import type { Env } from './env.js';
 import { STATUS, cellUrl, json } from './http.js';
+import { MAX_BODY } from './limits.js';
 import { tableCode } from './secrets.js';
+import { sourceOf } from './source.js';
 
+export { CreationLimiter } from './CreationLimiter.js';
 export { TableCell } from './TableCell.js';
 
-const MAX_BODY = 4_096;
 const OPEN_ATTEMPTS = 5;
 
 export default {
@@ -27,6 +29,7 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
     if (request.method !== 'POST') return json({ error: 'bad-frame' }, 405);
     const req = parseOpenRequest(await readJson(request));
     if (!req.ok) return json({ error: req.code }, 400);
+    if (!(await mayOpen(request, env))) return json({ error: 'rate-limited' }, 429);
     for (let i = 0; i < OPEN_ATTEMPTS; i++) {
       const code = tableCode();
       const res = await table(env, code).fetch(cellUrl('open'), {
@@ -58,6 +61,13 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
 
 function table(env: Env, code: string) {
   return env.TABLES.get(env.TABLES.idFromName(code), { locationHint: 'enam' });
+}
+
+/** Whether the request's network may open another table; a request with no address is not counted. */
+async function mayOpen(request: Request, env: Env): Promise<boolean> {
+  const source = sourceOf(request.headers.get('CF-Connecting-IP'));
+  if (source === null) return true;
+  return env.CREATIONS.get(env.CREATIONS.idFromName('creations'), { locationHint: 'enam' }).take(source);
 }
 
 /** A browser's request must come from this Worker's origin or a listed one. */
