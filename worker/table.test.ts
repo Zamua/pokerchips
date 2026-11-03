@@ -2,8 +2,9 @@ import { SELF, env, runDurableObjectAlarm, runInDurableObject } from 'cloudflare
 import { describe, expect, it, vi } from 'vitest';
 import { IDLE_LIFETIME_MS, MAX_SEATS } from '../domain/values.js';
 import type { ServerFrame, TableView } from '../protocol/frames.js';
-import { CREATIONS_PER_WINDOW, CREATION_WINDOW_MS, MAX_FRAME, MAX_SOCKETS } from './limits.js';
+import { CAPS, MAX_FRAME, MAX_SOCKETS, SOURCE_WINDOW_MS } from './limits.js';
 import { tableService } from './TableCell.js';
+import worker from './worker.js';
 
 const BASE = 'https://pokerchips.test';
 
@@ -292,7 +293,7 @@ describe('abuse limits', () => {
   });
 
   it('caps table creations per source network, not globally', async () => {
-    for (let i = 0; i < CREATIONS_PER_WINDOW; i++) expect((await openFrom(`198.51.100.${i}`)).status).toBe(201);
+    for (let i = 0; i < CAPS.creations; i++) expect((await openFrom(`198.51.100.${i}`)).status).toBe(201);
     const over = await openFrom('198.51.100.200');
     expect(over.status).toBe(429);
     expect(over.body).toEqual({ error: 'rate-limited' });
@@ -302,13 +303,13 @@ describe('abuse limits', () => {
   });
 
   it('counts an IPv6 network by its /64', async () => {
-    for (let i = 0; i < CREATIONS_PER_WINDOW; i++) expect((await openFrom(`2001:db8:bbbb:1::${i + 1}`)).status).toBe(201);
+    for (let i = 0; i < CAPS.creations; i++) expect((await openFrom(`2001:db8:bbbb:1::${i + 1}`)).status).toBe(201);
     expect((await openFrom('2001:db8:bbbb:1:ffff::9')).status).toBe(429);
     expect((await openFrom('2001:db8:bbbb:2::1')).status).toBe(201);
   });
 
   it('does not count a refused request against the cap', async () => {
-    for (let i = 0; i < CREATIONS_PER_WINDOW + 5; i++) {
+    for (let i = 0; i < CAPS.creations + 5; i++) {
       expect((await call('/api/tables', { name: '', buyIn: 1000 }, hostFrom('198.51.102.1'))).status).toBe(400);
     }
     expect((await openFrom('198.51.102.1')).status).toBe(201);
@@ -316,16 +317,101 @@ describe('abuse limits', () => {
 
   it('forgets a source when its window ends, and keeps no address while it lasts', async () => {
     const stub = env.CREATIONS.get(env.CREATIONS.idFromName('creations'));
-    for (let i = 0; i < CREATIONS_PER_WINDOW; i++) await openFrom('198.51.103.1');
+    for (let i = 0; i < CAPS.creations; i++) await openFrom('198.51.103.1');
     expect((await openFrom('198.51.103.1')).status).toBe(429);
     const stored = await runInDurableObject(stub, (_i, state) => JSON.stringify([...state.storage.kv.list()]));
     expect(stored).not.toContain('198.51.103');
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
-      vi.setSystemTime(Date.now() + CREATION_WINDOW_MS + 1);
+      vi.setSystemTime(Date.now() + SOURCE_WINDOW_MS + 1);
       await runDurableObjectAlarm(stub);
       expect(await runInDurableObject(stub, (_i, state) => [...state.storage.kv.list()])).toEqual([]);
       expect((await openFrom('198.51.103.1')).status).toBe(201);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('lookup limits', () => {
+  const from = (ip: string) => ({ 'CF-Connecting-IP': ip });
+  const unknown = (i: number) => `q${String(i).padStart(7, '0')}`;
+  const lookup = (code: string, ip: string) => call(`/api/tables/${code}`, undefined, from(ip));
+  const missOut = async (ip: string) => {
+    for (let i = 0; i < CAPS.misses; i++) expect((await lookup(unknown(i), ip)).status).toBe(404);
+  };
+
+  it('refuses a malformed code on every route before any table is reached', async () => {
+    for (const bad of ['short', 'toolongcode', 'UPPER!!!', 'abc def1']) {
+      expect((await call(`/api/tables/${bad}`)).status, bad).toBe(400);
+      expect((await call(`/api/tables/${bad}/seats`, { name: 'Ana' })).status, bad).toBe(400);
+      expect((await SELF.fetch(`${BASE}/api/tables/${bad}/socket`, { headers: { Upgrade: 'websocket' } })).status, bad).toBe(400);
+    }
+  });
+
+  it('refuses a source that has looked up too many tables that do not exist, and only that source', async () => {
+    await missOut('10.20.1.10');
+    const over = await lookup(unknown(999), '10.20.1.10');
+    expect(over.status).toBe(429);
+    expect(over.body).toEqual({ error: 'rate-limited' });
+    expect((await lookup(unknown(999), '10.20.1.200')).status).toBe(429);
+    expect((await lookup(unknown(999), '10.20.2.10')).status).toBe(404);
+    expect((await lookup(unknown(999), '2001:db8:cccc::1')).status).toBe(404);
+  });
+
+  it('counts a join or a socket to a missing table as a miss too', async () => {
+    const ip = '10.20.3.1';
+    for (let i = 0; i < CAPS.misses / 2; i++) {
+      expect((await call(`/api/tables/${unknown(i)}/seats`, { name: 'Ana' }, from(ip))).status).toBe(404);
+      const res = await SELF.fetch(`${BASE}/api/tables/${unknown(i)}/socket`, { headers: { Upgrade: 'websocket', ...from(ip) } });
+      expect(res.status).toBe(101);
+    }
+    expect((await lookup(unknown(999), ip)).status).toBe(429);
+    expect((await call(`/api/tables/${unknown(998)}/seats`, { name: 'Ana' }, from(ip))).status).toBe(429);
+    const socket = await SELF.fetch(`${BASE}/api/tables/${unknown(997)}/socket`, { headers: { Upgrade: 'websocket', ...from(ip) } });
+    expect(socket.status).toBe(429);
+  });
+
+  it('does not count a lookup of a table that exists, however many', async () => {
+    const t = await openTable();
+    const ip = '10.20.4.1';
+    for (let i = 0; i < CAPS.misses + 10; i++) expect((await lookup(t.code, ip)).status).toBe(200);
+    expect((await lookup(unknown(1), ip)).status).toBe(404);
+  });
+
+  it('keeps misses and creations apart', async () => {
+    const ip = '10.20.5.1';
+    await missOut(ip);
+    expect((await call('/api/tables', { name: 'Ana', buyIn: 1000 }, from(ip))).status).toBe(201);
+    const other = '10.20.6.1';
+    for (let i = 0; i < CAPS.creations; i++) await call('/api/tables', { name: 'Ana', buyIn: 1000 }, from(other));
+    expect((await lookup(unknown(1), other)).status).toBe(404);
+  });
+
+  it('lets a request through when the limiter is down', async () => {
+    const down = async () => {
+      throw new Error('overloaded');
+    };
+    const broken = { ...env, CREATIONS: { idFromName: () => 'x', get: () => ({ take: down, reached: down }) } } as unknown as typeof env;
+    const send = (path: string, body?: unknown) =>
+      worker.fetch!(
+        new Request(`${BASE}${path}`, { method: body === undefined ? 'GET' : 'POST', body: body === undefined ? undefined : JSON.stringify(body), headers: from('10.20.7.1') }),
+        broken,
+      );
+    expect((await send('/api/tables', { name: 'Ana', buyIn: 1000 })).status).toBe(201);
+    expect((await send(`/api/tables/${unknown(1)}`)).status).toBe(404);
+  });
+
+  it('keeps no address in clear or hashed past the window', async () => {
+    const stub = env.CREATIONS.get(env.CREATIONS.idFromName('creations'));
+    await lookup(unknown(1), '10.20.8.1');
+    const stored = await runInDurableObject(stub, (_i, state) => JSON.stringify([...state.storage.kv.list()]));
+    expect(stored).not.toContain('10.20.8');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + SOURCE_WINDOW_MS + 1);
+      await runDurableObjectAlarm(stub);
+      expect(await runInDurableObject(stub, (_i, state) => [...state.storage.kv.list()])).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

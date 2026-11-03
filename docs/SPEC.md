@@ -112,9 +112,9 @@ add a `note` entry; presence is not in the ledger.
 | Request | Answer |
 | --- | --- |
 | `POST /api/tables` `{ name, buyIn? }` | 201 `{ code, seatId, seatKey }`; 429 `rate-limited` |
-| `GET /api/tables/<code>` | 200 `{ code, seats: [{ name, here }] }`, or 404 |
-| `POST /api/tables/<code>/seats` `{ name }` | 201 `{ seatId, seatKey }`; 404; 409 `name-taken` or `table-full` |
-| `GET /api/tables/<code>/socket` (WebSocket upgrade) | 101; for a table that does not exist the socket answers `denied` with `not-found` and closes; 503 `table-full` while the table holds 64 sockets |
+| `GET /api/tables/<code>` | 200 `{ code, seats: [{ name, here }] }`, or 404; 429 `rate-limited` |
+| `POST /api/tables/<code>/seats` `{ name }` | 201 `{ seatId, seatKey }`; 404; 409 `name-taken` or `table-full`; 429 `rate-limited` |
+| `GET /api/tables/<code>/socket` (WebSocket upgrade) | 101; for a table that does not exist the socket answers `denied` with `not-found` and closes; 503 `table-full` while the table holds 64 sockets; 429 `rate-limited` |
 | `GET /healthz` | 200 `ok` |
 
 A request whose `Origin` is not on the allowed list is refused with 403.
@@ -125,7 +125,13 @@ A request body may be at most 4 KiB. One network, an IPv4 /24 or an IPv6
 /64, may open 30 tables an hour; further requests are answered 429. The
 count is kept under a hash of a random salt and the network, and the salt,
 the hashes and the counts are erased when the hour ends. No address is
-stored or logged, and a request with no address is not counted.
+stored or logged, and a request with no address is not counted. A code that
+is not 8 characters of `a-z0-9` is refused 400 before any table is reached.
+The same network may also look up 120 tables that do not exist an hour (a
+`GET`, a join or a socket for a code with no table, counted apart from
+creations); past that, requests naming a code are answered 429 until the hour
+ends. A lookup of a table that exists is not counted. If the counter is
+unavailable the request goes through.
 
 ### WebSocket
 

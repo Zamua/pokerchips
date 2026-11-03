@@ -4,7 +4,7 @@ import { TableService } from '../app/tableService.js';
 import { parseTableCode } from '../domain/values.js';
 import { PING, PONG, type ServerFrame, opOf, parseClientFrame, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
 import type { Env } from './env.js';
-import { CELL_ROUTES, STATUS, json } from './http.js';
+import { CELL_ROUTES, MISSING, STATUS, json } from './http.js';
 import { MAX_FRAME, MAX_SOCKETS } from './limits.js';
 import { RateLimit } from './rateLimit.js';
 import { secrets } from './secrets.js';
@@ -143,7 +143,7 @@ export class TableCell extends DurableObject<Env> {
       server.accept();
       send(server, { t: 'denied', code: 'not-found' });
       server.close(4004, 'not-found');
-      return new Response(null, { status: 101, webSocket: client });
+      return new Response(null, { status: 101, webSocket: client, headers: { [MISSING]: '1' } });
     }
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ seat: null } satisfies Attachment);
