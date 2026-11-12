@@ -37,3 +37,16 @@ describe('client frames', () => {
     expect(parseClientFrame(split([1, 2]))).toBeNull();
   });
 });
+
+describe('a hello frame', () => {
+  const seatKey = 'a'.repeat(32);
+
+  it('carries a well-formed device id and drops any other, still a hello', () => {
+    const device = 'b'.repeat(32);
+    expect(parseClientFrame(JSON.stringify({ t: 'hello', seatKey, device }))).toEqual({ t: 'hello', seatKey, device });
+    for (const bad of ['short', 'B'.repeat(32), 42, null, { a: 1 }]) {
+      expect(parseClientFrame(JSON.stringify({ t: 'hello', seatKey, device: bad }))).toEqual({ t: 'hello', seatKey });
+    }
+    expect(parseClientFrame(JSON.stringify({ t: 'hello', seatKey }))).toEqual({ t: 'hello', seatKey });
+  });
+});

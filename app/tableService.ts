@@ -4,7 +4,7 @@ import type { Entry } from '../domain/ledger.js';
 import { type Command, type SeatOutcome, type Table, arrive, execute, join, openTable, seatByKeyHash, settle } from '../domain/table.js';
 import { IDLE_LIFETIME_MS, LEDGER_TAIL, type SeatId, type TableCode } from '../domain/values.js';
 import { type JoinRequest, type OpenRequest, type TableView, viewOf } from '../protocol/frames.js';
-import type { Answer, Clock, Publisher, Secrets, TableStore } from './ports.js';
+import type { Answer, Applied, Clock, Publisher, Secrets, TableStore } from './ports.js';
 
 /** An expiry check that finds the table still in use waits this long before the next. */
 const RECHECK_MS = 60 * 60_000;
@@ -21,6 +21,7 @@ export class TableService {
     private readonly publisher: Publisher,
     private readonly clock: Clock,
     private readonly secrets: Secrets,
+    private readonly applied: Applied = () => {},
   ) {}
 
   async open(code: TableCode, { name, buyIn }: OpenRequest): Promise<Seated> {
@@ -93,6 +94,7 @@ export class TableService {
     const answer: Answer = o.ok ? { t: 'ack', op, seq: o.table.seq } : { t: 'nack', op, code: o.code };
     this.store.saveWithAnswer(o.ok && o.table !== table ? o.table : null, o.ok ? o.entries : [], seat, answer);
     if (o.ok && o.table !== table) this.publish();
+    if (o.ok && o.entries.length > 0) this.applied(o.entries);
     return answer;
   }
 

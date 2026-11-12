@@ -133,6 +133,24 @@ creations); past that, requests naming a code are answered 429 until the hour
 ends. A lookup of a table that exists is not counted. If the counter is
 unavailable the request goes through.
 
+### Usage counts
+
+A deployment may count how the app is used. A client makes a random 128-bit
+id on first use, keeps it in the browser's local storage (no cookie), and
+sends it as the `X-Device` header on `POST` requests and as `device` in the
+`hello` frame. The Worker at once turns it into a keyed hash (HMAC-SHA256
+with a secret, 16 hex characters) and writes one event per action under that
+hash: `active` (a seat welcomed), `table_created`, `game_started` (the first
+bet at a table) and `hand_played` (a pot awarded by collect or split). An
+event holds the hash, the app name, the action and a count, nothing else:
+no name, table code, seat, amount or address.
+
+The id is never stored or logged by the server, and no table state refers to
+it or to its hash; the hash lives only on the open socket. A missing or
+malformed id writes no event and changes nothing else, and a deployment
+without the dataset or the secret writes none at all. A failed write never
+fails a request.
+
 ### WebSocket
 
 Every frame is one JSON object with a `t` field.
@@ -141,7 +159,7 @@ Client to table:
 
 | Frame | Meaning |
 | --- | --- |
-| `{ t: "hello", seatKey }` | Must be first. Answered by `welcome` or `denied`. |
+| `{ t: "hello", seatKey, device? }` | Must be first. Answered by `welcome` or `denied`. `device` is the client's device id (see Usage counts). |
 | `{ t: "cmd", op, cmd: { type, ... } }` | A command. `op` is a client-made id; a repeated `op` from the same seat is answered with the first answer again and not applied twice, so a client may resend after a reconnect. |
 | `{ t: "history", before }` | Asks for up to 50 ledger entries older than `before`. |
 | `{ t: "ping" }` | Answered `{ t: "pong" }` without waking the table. |

@@ -397,6 +397,7 @@ describe('lookup limits', () => {
       worker.fetch!(
         new Request(`${BASE}${path}`, { method: body === undefined ? 'GET' : 'POST', body: body === undefined ? undefined : JSON.stringify(body), headers: from('10.20.7.1') }),
         broken,
+        { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
       );
     expect((await send('/api/tables', { name: 'Ana', buyIn: 1000 })).status).toBe(201);
     expect((await send(`/api/tables/${unknown(1)}`)).status).toBe(404);
@@ -415,6 +416,40 @@ describe('lookup limits', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('a device id', () => {
+  it('changes nothing a client sees, whether it is sent, missing or malformed', async () => {
+    for (const device of ['d'.repeat(32), 'not-an-id', '']) {
+      const res = await call('/api/tables', { name: 'Ana', buyIn: 1000 }, { 'X-Device': device });
+      expect(res.status, device).toBe(201);
+      const c = await Client.connect(res.body.code);
+      c.send({ t: 'hello', seatKey: res.body.seatKey, device });
+      await c.next((f) => f.t === 'welcome');
+      c.send({ t: 'cmd', op: 'b', cmd: { type: 'bet', pot: 'main', amount: 5 } });
+      expect(await c.answer('b')).toMatchObject({ t: 'ack' });
+      c.send({ t: 'cmd', op: 'w', cmd: { type: 'collect', pot: 'main' } });
+      expect(await c.answer('w')).toMatchObject({ t: 'ack' });
+    }
+  });
+
+  it('is kept nowhere in the table storage', async () => {
+    const device = 'e'.repeat(32);
+    const t = await openTable();
+    const c = await Client.connect(t.code);
+    c.send({ t: 'hello', seatKey: t.seatKey, device });
+    await c.next((f) => f.t === 'welcome');
+    c.send({ t: 'cmd', op: 'b', cmd: { type: 'bet', pot: 'main', amount: 5 } });
+    await c.answer('b');
+    const stored = await runInDurableObject(env.TABLES.get(env.TABLES.idFromName(t.code)), (_cell, state) =>
+      JSON.stringify([
+        [...state.storage.kv.list()],
+        state.storage.sql.exec('SELECT json FROM state').toArray(),
+        state.storage.sql.exec('SELECT json FROM ledger').toArray(),
+      ]),
+    );
+    expect(stored).not.toContain(device);
   });
 });
 

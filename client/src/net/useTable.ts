@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entry } from '../../../domain/ledger.js';
 import type { Command } from '../../../domain/table.js';
 import type { TableView } from '../../../protocol/frames.js';
+import { deviceId } from '../store/device.js';
 import { recent } from '../store/recent.js';
 import { api } from './api.js';
 import type { Status } from './link.js';
@@ -29,6 +30,7 @@ export function useTable(code: string, seatKey: string): TableConnection {
     const ts = new TableSocket({
       url: api.socketUrl(code),
       seatKey,
+      device: deviceId(),
       onState: (s, seat) => {
         setState(s);
         setSeatId(seat);

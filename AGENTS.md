@@ -67,7 +67,7 @@ docs(spec): clarify who may undo an entry
 domain/       the Table aggregate, ledger entries, values, version 2 import; pure
 protocol/     frames and the table view shared by the Worker and the client
 app/          TableService and its ports (store, publisher, clock, secrets)
-worker/       Worker entry, TableCell (the Durable Object), SQLite store
+worker/       Worker entry, TableCell (the Durable Object), SQLite store, activity events
 client/       React app (Vite): screens, drawers, socket lifecycle, e2e
 docs/         SPEC.md (behavior), ARCHITECTURE.md (code), design/ (the mockup)
 scripts/      smoke.mjs, the post-deploy smoke test

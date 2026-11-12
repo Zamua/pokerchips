@@ -21,6 +21,8 @@ export interface SocketLike {
 export interface TableSocketOptions {
   url: string;
   seatKey: string;
+  /** This browser's id, sent with the hello so usage can be counted. */
+  device?: string | null;
   onState(state: TableView, seatId: string): void;
   onStatus(status: Status): void;
   open?: (url: string) => SocketLike;
@@ -126,7 +128,7 @@ export class TableSocket {
       }
       case 'send':
         if (this.sock?.ws.readyState !== OPEN) return;
-        this.sock.ws.send(effect.frame === 'ping' ? PING : JSON.stringify({ t: 'hello', seatKey: this.o.seatKey }));
+        this.sock.ws.send(effect.frame === 'ping' ? PING : JSON.stringify(this.o.device ? { t: 'hello', seatKey: this.o.seatKey, device: this.o.device } : { t: 'hello', seatKey: this.o.seatKey }));
         return;
       case 'timer':
         clearTimeout(this.timer);
