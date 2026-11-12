@@ -1,8 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { Publisher } from '../app/ports.js';
+import type { Applied, Publisher } from '../app/ports.js';
 import { TableService } from '../app/tableService.js';
+import type { Entry } from '../domain/ledger.js';
 import { parseTableCode } from '../domain/values.js';
 import { PING, PONG, type ServerFrame, opOf, parseClientFrame, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
+import { actionsOf, actorOf, record } from './activity.js';
 import type { Env } from './env.js';
 import { CELL_ROUTES, MISSING, STATUS, json } from './http.js';
 import { MAX_FRAME, MAX_SOCKETS } from './limits.js';
@@ -12,21 +14,28 @@ import { SqlTableStore } from './sqlStore.js';
 
 interface Attachment {
   seat: string | null;
+  /** The hashed actor activity events are written under; never the device id. */
+  actor?: string | null;
 }
 
+/** Set once a bet has been made at the table. */
+const PLAYED = 'played';
+
 /** A table's use cases over its Durable Object's storage, on the wall clock. */
-export const tableService = (storage: DurableObjectStorage, publisher: Publisher) =>
-  new TableService(new SqlTableStore(storage), publisher, { now: () => Date.now() }, secrets);
+export const tableService = (storage: DurableObjectStorage, publisher: Publisher, applied?: Applied) =>
+  new TableService(new SqlTableStore(storage), publisher, { now: () => Date.now() }, secrets, applied);
 
 /** The actor that owns one table: its storage, its sockets, its expiry. */
 export class TableCell extends DurableObject<Env> {
   private readonly service: TableService;
   private readonly limit = new RateLimit();
+  /** The socket whose command is running, for the events of what it applies. */
+  private acting: WebSocket | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const publisher: Publisher = { broadcast: (frame) => this.broadcast(frame) };
-    this.service = tableService(ctx.storage, publisher);
+    this.service = tableService(ctx.storage, publisher, (entries) => this.note(entries));
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
     // Sockets lost with an earlier instance never sent a close.
     this.service.settle(this.connected());
@@ -96,12 +105,19 @@ export class TableCell extends DurableObject<Env> {
           return;
         }
         const state = this.service.arrived(held);
-        ws.serializeAttachment({ seat: held } satisfies Attachment);
+        const actor = await actorOf(this.env, frame.device ?? null);
+        ws.serializeAttachment({ seat: held, actor } satisfies Attachment);
         if (state) send(ws, { t: 'welcome', seatId: held, state });
+        record(this.env, actor, 'active');
         return;
       }
       case 'cmd':
-        send(ws, seat ? this.service.command(seat, frame.op, frame.cmd) : { t: 'nack', op: frame.op, code: 'bad-frame' });
+        this.acting = ws;
+        try {
+          send(ws, seat ? this.service.command(seat, frame.op, frame.cmd) : { t: 'nack', op: frame.op, code: 'bad-frame' });
+        } finally {
+          this.acting = null;
+        }
         return;
       case 'history':
         if (seat) send(ws, { t: 'history', entries: this.service.history(frame.before) });
@@ -126,7 +142,8 @@ export class TableCell extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    if (!this.service.expire(this.ctx.getWebSockets().length)) await this.arm();
+    if (this.service.expire(this.ctx.getWebSockets().length)) this.ctx.storage.kv.delete(PLAYED);
+    else await this.arm();
   }
 
   private async arm(): Promise<void> {
@@ -148,6 +165,15 @@ export class TableCell extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ seat: null } satisfies Attachment);
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /** Writes the activity events of entries just applied, under the acting socket's actor. */
+  private note(entries: Entry[]): void {
+    const kv = this.ctx.storage.kv;
+    const played = kv.get<boolean>(PLAYED) === true;
+    const actor = (this.acting?.deserializeAttachment() as Attachment | null)?.actor ?? null;
+    for (const action of actionsOf(entries, played)) record(this.env, actor, action);
+    if (!played && entries.some((e) => e.kind === 'bet')) kv.put(PLAYED, true);
   }
 
   private left(ws: WebSocket): void {

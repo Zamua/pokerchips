@@ -75,6 +75,26 @@ describe('TableSocket', () => {
     expect(h.statuses).toEqual(['online']);
   });
 
+  it('names its device in the hello when it has one', () => {
+    const sockets: FakeSocket[] = [];
+    const ts = new TableSocket({
+      url: 'wss://x/api/tables/abcd1234/socket',
+      seatKey: 'k'.repeat(32),
+      device: 'd'.repeat(32),
+      onState: () => {},
+      onStatus: () => {},
+      open: () => {
+        const s = new FakeSocket();
+        sockets.push(s);
+        return s;
+      },
+    });
+    ts.start();
+    sockets[0]!.open();
+    expect(sockets[0]!.sent).toEqual([{ t: 'hello', seatKey: 'k'.repeat(32), device: 'd'.repeat(32) }]);
+    ts.stop();
+  });
+
   it('holds commands until welcome, then resolves each by its op', async () => {
     const h = harness();
     h.ts.start();

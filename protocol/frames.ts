@@ -27,7 +27,7 @@ export interface TableView {
 }
 
 export type ClientFrame =
-  | { t: 'hello'; seatKey: string }
+  | { t: 'hello'; seatKey: string; device?: string }
   | { t: 'cmd'; op: string; cmd: Command }
   | { t: 'history'; before: number }
   | { t: 'ping' };
@@ -66,6 +66,13 @@ export function viewOf(table: Table, ledgerTail: Entry[]): TableView {
 
 const OP = /^[A-Za-z0-9_-]{1,64}$/;
 const KEY = /^[0-9a-f]{32}$/;
+const DEVICE = /^[0-9a-f]{32}$/;
+
+/** The request header a client names its device in. */
+export const DEVICE_HEADER = 'X-Device';
+
+/** A device id as a client sends it, or null; a bad one is dropped, never refused. */
+export const parseDevice = (v: unknown): string | null => (typeof v === 'string' && DEVICE.test(v) ? v : null);
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** The op of a frame that may not parse as a whole, or '' when it has none. */
@@ -88,8 +95,11 @@ export function parseClientFrame(text: string): ClientFrame | null {
   }
   if (!isObject(v)) return null;
   switch (v.t) {
-    case 'hello':
-      return typeof v.seatKey === 'string' && KEY.test(v.seatKey) ? { t: 'hello', seatKey: v.seatKey } : null;
+    case 'hello': {
+      if (typeof v.seatKey !== 'string' || !KEY.test(v.seatKey)) return null;
+      const device = parseDevice(v.device);
+      return device ? { t: 'hello', seatKey: v.seatKey, device } : { t: 'hello', seatKey: v.seatKey };
+    }
     case 'ping':
       return { t: 'ping' };
     case 'history':

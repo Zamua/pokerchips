@@ -24,6 +24,9 @@ export interface Publisher {
   broadcast(frame: ServerFrame): void;
 }
 
+/** Told the entries of each command that changed the table. */
+export type Applied = (entries: Entry[]) => void;
+
 export interface Clock {
   now(): number;
 }

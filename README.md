@@ -18,6 +18,14 @@ key kept on your phone keeps your seat. See [`docs/SPEC.md`](docs/SPEC.md)
 for the rules and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
 code.
 
+## What is collected
+
+No account, no cookie, no address kept. To count how many devices use the
+app, your browser makes a random id and sends it along; the server keeps
+only a keyed hash of it, with four counters: active today, table created,
+game started, hand played. Nothing links it to your name, seat or table.
+[`docs/SPEC.md`](docs/SPEC.md) has the details under "Usage counts".
+
 ## Run it
 
 Node 22 or newer.
@@ -44,6 +52,8 @@ SMOKE_BASE_URL=http://127.0.0.1:8787 make smoke
 
 `npm run build` writes the client to `client/dist`; `wrangler deploy` with a
 config naming the Worker, its routes and `ALLOWED_ORIGINS` publishes both.
+Usage counts are off unless the config binds an Analytics Engine dataset as
+`ACTIVITY` and the Worker has an `ACTIVITY_SALT` secret.
 The free Workers plan is enough.
 
 ## License

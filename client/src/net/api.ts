@@ -1,4 +1,6 @@
 import type { ErrorCode } from '../../../domain/errors.js';
+import { DEVICE_HEADER } from '../../../protocol/frames.js';
+import { deviceId } from '../store/device.js';
 
 export type Seated = { code: string; seatId: string; seatKey: string };
 export type Result<T> = { ok: true; value: T } | { ok: false; code: ErrorCode | 'network' };
@@ -8,7 +10,7 @@ async function request<T>(path: string, body?: unknown): Promise<Result<T>> {
   try {
     res = await fetch(path, {
       method: body === undefined ? 'GET' : 'POST',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json', ...deviceHeader() },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -17,6 +19,11 @@ async function request<T>(path: string, body?: unknown): Promise<Result<T>> {
   const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
   if (!res.ok) return { ok: false, code: (json?.error as ErrorCode) ?? 'network' };
   return { ok: true, value: json as T };
+}
+
+function deviceHeader(): Record<string, string> {
+  const device = deviceId();
+  return device ? { [DEVICE_HEADER]: device } : {};
 }
 
 export const api = {

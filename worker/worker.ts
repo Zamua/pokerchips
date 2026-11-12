@@ -1,5 +1,6 @@
 import { parseTableCode } from '../domain/values.js';
-import { parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
+import { DEVICE_HEADER, parseDevice, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
+import { actorOf, record } from './activity.js';
 import type { Env } from './env.js';
 import { MISSING, STATUS, cellUrl, json } from './http.js';
 import { MAX_BODY } from './limits.js';
@@ -12,16 +13,16 @@ export { TableCell } from './TableCell.js';
 const OPEN_ATTEMPTS = 5;
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === '/healthz') return new Response('ok\n');
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     if (!originAllowed(request, url, env)) return json({ error: 'bad-frame' }, 403);
-    return api(request, url, env);
+    return api(request, url, env, ctx);
   },
 } satisfies ExportedHandler<Env>;
 
-async function api(request: Request, url: URL, env: Env): Promise<Response> {
+async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
   const parts = url.pathname.split('/').filter(Boolean); // api, tables, <code>, <rest>
   if (parts[1] !== 'tables' || parts.length > 4) return json({ error: 'not-found' }, 404);
 
@@ -36,7 +37,12 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
         method: 'POST',
         body: JSON.stringify({ code, ...req.value }),
       });
-      if (res.status !== STATUS.exists) return res;
+      if (res.status === STATUS.exists) continue;
+      if (res.status === 201) {
+        const device = parseDevice(request.headers.get(DEVICE_HEADER));
+        ctx.waitUntil(actorOf(env, device).then((actor) => record(env, actor, 'table_created')));
+      }
+      return res;
     }
     return json({ error: 'bad-code' }, 503);
   }
