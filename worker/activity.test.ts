@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Entry } from '../domain/ledger.js';
-import { type ActivityEnv, actionsOf, actorOf, record } from './activity.js';
+import { type ActivityEnv, actionsOf, actorOf, record, skipped } from './activity.js';
 
 const device = 'a'.repeat(32);
 const dataset = () => ({ writeDataPoint: vi.fn() });
@@ -65,5 +65,15 @@ describe('the events of a command', () => {
 
   it('is nothing for other entries', () => {
     expect(actionsOf([entry('adjust'), entry('undo'), entry('openPot'), entry('note')], false)).toEqual([]);
+  });
+});
+
+describe('a request marked as test traffic', () => {
+  const request = (headers: Record<string, string>) => new Request('https://example.test/', { headers });
+
+  it('is skipped only when the header is 1', () => {
+    expect(skipped(request({ 'X-Activity-Skip': '1' }))).toBe(true);
+    expect(skipped(request({ 'X-Activity-Skip': '0' }))).toBe(false);
+    expect(skipped(request({}))).toBe(false);
   });
 });

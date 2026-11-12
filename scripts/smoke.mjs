@@ -4,6 +4,8 @@
 // which expires on its own. Usage: SMOKE_BASE_URL=https://host node scripts/smoke.mjs
 const base = (process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:8787').replace(/\/$/, '');
 const origin = new URL(base).origin;
+// Marks every call as test traffic, so a smoke run is not counted as use.
+const QUIET = { 'X-Activity-Skip': '1' };
 let failed = 0;
 
 function check(name, ok, detail = '') {
@@ -12,12 +14,12 @@ function check(name, ok, detail = '') {
 }
 
 async function post(path, body) {
-  const res = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body) });
+  const res = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin, ...QUIET }, body: JSON.stringify(body) });
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
 function connect(code, seatKey) {
-  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/api/tables/${code}/socket`);
+  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/api/tables/${code}/socket`, { headers: QUIET });
   const frames = [];
   const waiters = [];
   ws.addEventListener('message', (e) => {
