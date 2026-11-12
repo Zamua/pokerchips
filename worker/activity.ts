@@ -31,11 +31,15 @@ export async function actorOf(env: ActivityEnv, device: string | null): Promise<
   }
 }
 
-/** Writes one event for an actor; no actor, no binding or a failed write is silently nothing. */
+/**
+ * Writes one event for an actor; no actor, no binding or a failed write is
+ * silently nothing. The dataset samples per index, so only `active` is indexed
+ * by the bare actor: every other action has its own index and keeps its count.
+ */
 export function record(env: ActivityEnv, actor: string | null, action: Action): void {
   if (!actor || !env.ACTIVITY) return;
   try {
-    env.ACTIVITY.writeDataPoint({ indexes: [actor], blobs: [APP, action, ''], doubles: [1] });
+    env.ACTIVITY.writeDataPoint({ indexes: [action === 'active' ? actor : `${actor}:${action}`], blobs: [APP, action, ''], doubles: [1] });
   } catch {
     // An event is never worth a failed request.
   }

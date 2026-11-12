@@ -142,7 +142,9 @@ sends it as the `X-Device` header on `POST` requests and as `device` in the
 with a secret, 16 hex characters) and writes one event per action under that
 hash: `active` (a seat welcomed), `table_created`, `game_started` (the first
 bet at a table) and `hand_played` (a pot awarded by collect or split). An
-event holds the hash, the app name, the action and a count, nothing else:
+event holds the hash (alone for `active`, as `<hash>:<action>` for the rest,
+so that a sampled dataset keeps each action's count), the app name, the
+action and a count, nothing else:
 no name, table code, seat, amount or address.
 
 The id is never stored or logged by the server, and no table state refers to

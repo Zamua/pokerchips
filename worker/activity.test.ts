@@ -30,11 +30,21 @@ describe('the actor of a device id', () => {
 });
 
 describe('recording an event', () => {
-  it('writes the actor as the index, then app, action, an empty detail and a count of one', () => {
+  it('writes active under the actor alone, then app, action, an empty detail and a count of one', () => {
+    const e = env();
+    record(e, '0123456789abcdef', 'active');
+    expect(e.ACTIVITY.writeDataPoint).toHaveBeenCalledExactlyOnceWith({
+      indexes: ['0123456789abcdef'],
+      blobs: ['pokerchips', 'active', ''],
+      doubles: [1],
+    });
+  });
+
+  it('writes any other action under the actor and the action', () => {
     const e = env();
     record(e, '0123456789abcdef', 'table_created');
     expect(e.ACTIVITY.writeDataPoint).toHaveBeenCalledExactlyOnceWith({
-      indexes: ['0123456789abcdef'],
+      indexes: ['0123456789abcdef:table_created'],
       blobs: ['pokerchips', 'table_created', ''],
       doubles: [1],
     });
