@@ -151,6 +151,11 @@ malformed id writes no event and changes nothing else, and a deployment
 without the dataset or the secret writes none at all. A failed write never
 fails a request.
 
+A request with the header `X-Activity-Skip: 1` writes no event: a table it
+opens is not counted, and a socket whose upgrade request carries it counts
+for nothing while it is open. Scripted checks against a deployment send it,
+so they are not counted as use.
+
 ### WebSocket
 
 Every frame is one JSON object with a `t` field.

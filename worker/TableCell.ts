@@ -4,7 +4,7 @@ import { TableService } from '../app/tableService.js';
 import type { Entry } from '../domain/ledger.js';
 import { parseTableCode } from '../domain/values.js';
 import { PING, PONG, type ServerFrame, opOf, parseClientFrame, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
-import { actionsOf, actorOf, record } from './activity.js';
+import { actionsOf, actorOf, record, skipped } from './activity.js';
 import type { Env } from './env.js';
 import { CELL_ROUTES, MISSING, STATUS, json } from './http.js';
 import { MAX_FRAME, MAX_SOCKETS } from './limits.js';
@@ -16,6 +16,8 @@ interface Attachment {
   seat: string | null;
   /** The hashed actor activity events are written under; never the device id. */
   actor?: string | null;
+  /** The upgrade request was marked as test traffic. */
+  quiet?: boolean;
 }
 
 /** Set once a bet has been made at the table. */
@@ -91,7 +93,8 @@ export class TableCell extends DurableObject<Env> {
       return;
     }
     const frame = parseClientFrame(text);
-    const seat = (ws.deserializeAttachment() as Attachment | null)?.seat ?? null;
+    const attached = ws.deserializeAttachment() as Attachment | null;
+    const seat = attached?.seat ?? null;
     if (!frame) {
       send(ws, { t: 'nack', op: opOf(text), code: 'bad-frame' });
       return;
@@ -105,8 +108,9 @@ export class TableCell extends DurableObject<Env> {
           return;
         }
         const state = this.service.arrived(held);
-        const actor = await actorOf(this.env, frame.device ?? null);
-        ws.serializeAttachment({ seat: held, actor } satisfies Attachment);
+        const quiet = attached?.quiet;
+        const actor = quiet ? null : await actorOf(this.env, frame.device ?? null);
+        ws.serializeAttachment({ seat: held, actor, quiet } satisfies Attachment);
         if (state) send(ws, { t: 'welcome', seatId: held, state });
         record(this.env, actor, 'active');
         return;
@@ -163,7 +167,7 @@ export class TableCell extends DurableObject<Env> {
       return new Response(null, { status: 101, webSocket: client, headers: { [MISSING]: '1' } });
     }
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ seat: null } satisfies Attachment);
+    server.serializeAttachment({ seat: null, quiet: skipped(request) } satisfies Attachment);
     return new Response(null, { status: 101, webSocket: client });
   }
 

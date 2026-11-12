@@ -9,6 +9,10 @@ export interface ActivityEnv {
 }
 
 const APP = 'pokerchips';
+
+/** A request with this header set to 1 is test traffic and counts for nothing. */
+export const SKIP_HEADER = 'X-Activity-Skip';
+export const skipped = (request: Request): boolean => request.headers.get(SKIP_HEADER) === '1';
 const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 /**

@@ -1,6 +1,6 @@
 import { parseTableCode } from '../domain/values.js';
 import { DEVICE_HEADER, parseDevice, parseJoinRequest, parseOpenRequest } from '../protocol/frames.js';
-import { actorOf, record } from './activity.js';
+import { actorOf, record, skipped } from './activity.js';
 import type { Env } from './env.js';
 import { MISSING, STATUS, cellUrl, json } from './http.js';
 import { MAX_BODY } from './limits.js';
@@ -38,7 +38,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
         body: JSON.stringify({ code, ...req.value }),
       });
       if (res.status === STATUS.exists) continue;
-      if (res.status === 201) {
+      if (res.status === 201 && !skipped(request)) {
         const device = parseDevice(request.headers.get(DEVICE_HEADER));
         ctx.waitUntil(actorOf(env, device).then((actor) => record(env, actor, 'table_created')));
       }
